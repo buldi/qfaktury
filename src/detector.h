@@ -1,7 +1,7 @@
 /*checks for pragma once support*/
 // check this site: https://en.wikipedia.org/wiki/Pragma_once
-#if (defined(__SUNPRO_C) && (__SUNPRO_C >= 0x5140)) ||                         \
-    (defined(__SUNPRO_CC) && (__SUNPRO_CC >= 0x5140))
+#if (defined(__SUNPRO_C) && (__SUNPRO_C >= 0x5140))                                                \
+    || (defined(__SUNPRO_CC) && (__SUNPRO_CC >= 0x5140))
 // Oracle Developer Studio C/C++ (12.5 or later)
 #define _pragma_once_support 1
 #elif defined(_MSC_VER) && (_MSC_VER >= 1020) // MSVC
@@ -15,20 +15,17 @@
 #define _pragma_once_support 1
 #elif defined(__DMC__) // Digital Mars
 #define _pragma_once_support 1
-#elif defined(__GNUC__) &&                                                     \
-    ((__GNUC__ > 3) ||                                                         \
-     (defined(__GNUC_MINOR__) && (__GNUC__ == 3) && (__GNUC_MINOR__ >= 4)))
+#elif defined(__GNUC__)                                                                            \
+    && ((__GNUC__ > 3) || (defined(__GNUC_MINOR__) && (__GNUC__ == 3) && (__GNUC_MINOR__ >= 4)))
 // GCC
 #define _pragma_once_support 1
 #elif defined(__HP_aCC) && (__HP_aCC >= 61200)
 // HP aC++ (A.06.12)
 #define _pragma_once_support 1
-#elif defined(__xlC__) &&                                                      \
-    ((__xlC__ > 1301) || ((__xlC__ == 1301) && (__xlC_ver__ > 0100)))
+#elif defined(__xlC__) && ((__xlC__ > 1301) || ((__xlC__ == 1301) && (__xlC_ver__ > 0100)))
 // IBM
 #define _pragma_once_support 1
-#elif defined(__INTEL_COMPILER) || defined(__ICC) || defined(__ECC) ||         \
-    defined(__ICL)
+#elif defined(__INTEL_COMPILER) || defined(__ICC) || defined(__ECC) || defined(__ICL)
 // intel
 #define _pragma_once_support 1
 #elif defined(__POCC__) // Pelles C
@@ -44,18 +41,17 @@
 #endif
 
 #ifdef QUAZIP
-    #if QUAZIP == 1
-    #define QUAZIP_FOUND true
-    #endif
+#if QUAZIP == 1
+#define QUAZIP_FOUND true
+#endif
 #else
-    #define QUAZIP_FOUND false
+#define QUAZIP_FOUND false
 #endif
 
-
 #ifdef FEDORA_FOUND
-    #if FEDORA_FOUND == 1
-    #define DISTRO_FEDORA true
-    #endif
+#if FEDORA_FOUND == 1
+#define DISTRO_FEDORA true
+#endif
 #else
-    #define DISTRO_FEDORA false
+#define DISTRO_FEDORA false
 #endif

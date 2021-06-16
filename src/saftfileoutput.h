@@ -6,17 +6,12 @@
 #define SAFTFILEOUTPUT_H
 
 #include "saftfile.h"
-#include <QWidget>
-#include <QXmlSchema>
-#include <QXmlStreamWriter>
+
 #include <QPointer>
 
-class QPlainTextEdit;
-class QPushButton;
-class MessageHandler;
+#include "fwd.hpp"
 
-
-class SaftfileOutput : public Saftfile
+class SaftfileOutput final : public Saftfile
 {
     Q_OBJECT
 
@@ -32,7 +27,11 @@ public:
     const QString getHouseNumer(QString fullAddress);
     const QString getDoorNumer(QString fullAddress);
 
-    enum JPKType : unsigned char { JPK_VAT, JPK_FA };
+    enum class JPKType : unsigned char
+    {
+        JPK_VAT,
+        JPK_FA
+    };
     Q_ENUM(JPKType)
 
 public slots:
@@ -52,21 +51,20 @@ private slots:
     void textChanged();
 
 private:
-   QVector<InvoiceData> invoices;
-   QHash<QString, QString> allData;
-   QPointer<QPlainTextEdit> jpkContent;
-   QPointer<QPushButton> overwriteBtn;
-   QPointer<QLabel> statusText;
+    QVector<InvoiceData> invoices;
+    QHash<QString, QString> allData;
+    QPointer<QPlainTextEdit> jpkContent;
+    QPointer<QPushButton> overwriteBtn;
+    QPointer<QLabel> statusText;
 
-   void createNoteJPKWindow(MessageHandler* messageHandler = 0);
-   void saveXmlFile();
-   void saveXmlFileJKP_VAT(QXmlStreamWriter& xmlWriter);
-   void saveXmlFileJKP_FA(QXmlStreamWriter& xmlWriter);
-   void saveErrors(MessageHandler* messageHandler);
-   void moveCursor(int line, int column);
-   void inputTextFile(const QString content);
-   void putOptIfNotEmpty(QXmlStreamWriter& writer, QString node, QString value);
-
+    void createNoteJPKWindow(MessageHandler *messageHandler = nullptr);
+    void saveXmlFile();
+    void saveXmlFileJKP_VAT(QXmlStreamWriter &xmlWriter);
+    void saveXmlFileJKP_FA(QXmlStreamWriter &xmlWriter);
+    void saveErrors(MessageHandler *messageHandler);
+    void moveCursor(int line, int column);
+    void inputTextFile(const QString content);
+    void putOptIfNotEmpty(QXmlStreamWriter &writer, QString node, QString value);
 };
 
 #endif // SAFTFILEOUTPUT_H

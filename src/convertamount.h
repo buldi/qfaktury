@@ -15,20 +15,17 @@
 #include <QString>
 
 // class for converting number values to in words
-class ConvertAmount {
-
+class ConvertAmount final
+{
 public:
-  ConvertAmount();
-  ~ConvertAmount();
-
-  void convertTest();
-  QString convertPL(QString input, QString currency);
-  QString &descAmount(QString &, QString, QString = QString(),
-                      QString = QString(), QString = QString());
-  const QStringList hundsList();
-  const QStringList endsHundList();
-  const QStringList endsTensList();
-  const QStringList simpleNumbList();
+    void convertTest();
+    QString convertPL(QString input, QString currency);
+    QString &
+    descAmount(QString &, QString, QString = QString(), QString = QString(), QString = QString());
+    const QStringList hundsList();
+    const QStringList endsHundList();
+    const QStringList endsTensList();
+    const QStringList simpleNumbList();
 };
 
 #endif /* CONVERTAMOUNT_H_ */

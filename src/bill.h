@@ -15,20 +15,20 @@
 #include "invoice.h"
 
 // class for creating bills, using invoice class form
-class Bill : public Invoice {
-
-  Q_OBJECT
+class Bill final : public Invoice
+{
+    Q_OBJECT
 
 public:
-  Bill(QWidget *parent, IDataLayer *dl, QString in_form = QString());
-  ~Bill();
+    Bill(QWidget *parent, IDataLayer *dl, QString in_form = QString());
+    ~Bill();
 
 public slots:
 
-  void billInit();
+    void billInit();
 
 protected:
-  QString getInvoiceTypeAndSaveNr();
+    QString getInvoiceTypeAndSaveNr();
 };
 
 #endif /* BILL_H_ */

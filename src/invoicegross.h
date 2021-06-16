@@ -14,21 +14,21 @@
 #include "invoice.h"
 
 // class for creating and updating gross invoice
-class InvoiceGross : public Invoice {
-
-  Q_OBJECT
+class InvoiceGross final : public Invoice
+{
+    Q_OBJECT
 
 public:
-  InvoiceGross(QWidget *parent, IDataLayer *dl, QString in_form = QString());
+    InvoiceGross(QWidget *parent, IDataLayer *dl, QString in_form = QString());
 
 public slots:
 
-  void invoiceGrossInit();
-  void addGoods();
+    void invoiceGrossInit();
+    void addGoods();
 
 protected:
-  void calculateOneDiscount(int i);
-  QString getInvoiceTypeAndSaveNr();
+    void calculateOneDiscount(int i);
+    QString getInvoiceTypeAndSaveNr();
 };
 
 #endif /* FAKTURABRUTTO_H_ */

@@ -15,24 +15,24 @@
 #include "goodslist.h"
 
 // class for calculating gross and net in goods list window
-class GoodsGrossList : public GoodsList {
-
-  Q_OBJECT
+class GoodsGrossList final : public GoodsList
+{
+    Q_OBJECT
 
 public:
-  GoodsGrossList(QWidget *parent);
-  const QString getRetValGoodsBr();
-  ~GoodsGrossList();
+    GoodsGrossList(QWidget *parent);
+    const QString getRetValGoodsBr();
+    ~GoodsGrossList();
 
 public slots:
 
-  void calcNet();
-  void doAccept();
-  QString getPriceOfCurrent();
+    void calcNet();
+    void doAccept();
+    QString getPriceOfCurrent();
 
 private:
-  QString ret;
-  QString selectedItem;
+    QString ret;
+    QString selectedItem;
 };
 
 #endif /* GOODSGROSSLIST_H_ */

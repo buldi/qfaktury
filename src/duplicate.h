@@ -15,27 +15,27 @@
 #include "invoice.h"
 
 // class for cretaing duplicate documents from invoices
-class Duplicate : public Invoice {
-
-  Q_OBJECT
+class Duplicate final : public Invoice
+{
+    Q_OBJECT
 
 public:
-  Duplicate(QWidget *parent, IDataLayer *dl, QString in_form, bool ifEdited);
-  ~Duplicate();
+    Duplicate(QWidget *parent, IDataLayer *dl, QString in_form, bool ifEdited);
+    ~Duplicate();
 
-  virtual void setData(InvoiceData &invData);
+    virtual void setData(InvoiceData &invData);
 
 public slots:
 
-  virtual void canQuit();
-  void duplicateInit();
+    virtual void canQuit();
+    void duplicateInit();
 
 protected:
-  virtual void makeInvoiceHeadar(bool sellDate, bool breakPage, bool original);
+    virtual void makeInvoiceHeadar(bool sellDate, bool breakPage, bool original);
 
 private:
-  QDateEdit *duplicateDate;
-  QLabel *labelDupDate;
-  bool editMode;
+    QDateEdit *duplicateDate;
+    QLabel *labelDupDate;
+    bool editMode;
 };
 #endif /* DUPLICATE_H */

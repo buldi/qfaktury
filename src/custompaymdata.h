@@ -15,19 +15,17 @@
 #include <QDate>
 #include <QString>
 
-// class for holding data from splitting cost sum, when prepayment method is checked. One instance per one document
-class CustomPaymData {
-
+// class for holding data from splitting cost sum, when prepayment method is checked. One instance
+// per one document
+struct CustomPaymData final
+{
 public:
-  CustomPaymData();
-  virtual ~CustomPaymData();
-
-  QString payment1;
-  QString payment2;
-  QDate date1;
-  QDate date2;
-  double amount1;
-  double amount2;
+    QString payment1;
+    QString payment2;
+    QDate date1;
+    QDate date2;
+    double amount1;
+    double amount2;
 };
 
 #endif /* CUSTOMPAYMDATA_H_ */

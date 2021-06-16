@@ -5,36 +5,37 @@
 #ifndef GOODS_H
 #define GOODS_H
 
-#include "productdata.h"
 #include "ui_goods.h"
 
-class IDataLayer;
+#include <QDialog>
+
+#include "fwd.hpp"
 
 // class for saving good or service data with GUI
-class Goods : public QDialog, public Ui::Goods {
-
-  Q_OBJECT
+class Goods final : public QDialog, public Ui::Goods
+{
+    Q_OBJECT
 
 public:
-  Goods(QWidget *parent, int mode, IDataLayer * const dl);
-  void selectData(QString idx, int type); // called from MainWindow
-  const QString getRetGoods();
+    Goods(QWidget *parent, int mode, IDataLayer *const dl);
+    void selectData(QString idx, int type); // called from MainWindow
+    const QString getRetGoods();
 
 public slots:
 
-  void okClick();
+    void okClick();
 
 private:
-  IDataLayer* const dataLayer;
-  QString ret;
-  QStringList net;
-  int workMode; // Working mode - 0 = new; 1 = edit
+    IDataLayer *const dataLayer;
+    QString ret;
+    QStringList net;
+    int workMode; // Working mode - 0 = new; 1 = edit
 
-  void init();
-  void getData(ProductData prodData);
-  void setData(ProductData &prodData);
-  bool updateData();
-  bool insertData();
-  QString isEmpty(QString in);
+    void init();
+    void getData(ProductData prodData);
+    void setData(ProductData &prodData);
+    bool updateData();
+    bool insertData();
+    QString isEmpty(QString in);
 };
 #endif

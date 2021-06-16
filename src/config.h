@@ -1,7 +1,7 @@
 #define QFAKTURY_VERSION 0.7.2
 #include <QStringList>
 
-const QStringList blackEmergTemplate =
+const static QStringList blackEmergTemplate =
     QStringList() << ".page_break {page-break-before: always;}"
                   << "\n"
                   << "h1 {"

@@ -1,10 +1,15 @@
-#include "send.h"
 #include "buyers.h"
 #include "const.h"
 #include "convertamount.h"
 #include "idatalayer.h"
 #include "invoice.h"
 #include "invoicedata.h"
+#include "send.h"
+#include "settings.h"
+
+#include "debug_message.h"
+
+#include "emailwindow.h"
 
 #include <QCheckBox>
 #include <QDomDocument>
@@ -16,94 +21,101 @@
 #include <QMessageBox>
 #include <QRadioButton>
 #include <QRegularExpression>
+#include <QSettings>
 #include <QTableWidget>
 #include <QTextEdit>
+#include <QTextStream>
 #include <QVariant>
 #include <QWizard>
 #include <QWizardPage>
 
-Send::Send(QVector<BuyerData> buyersList, QVector<InvoiceData> invList,
-           QWidget *parent)
-    : QWizard(parent) {
+#include <QDebug>
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
+Send::Send(QVector<BuyerData> buyersList, QVector<InvoiceData> invList, QWidget *parent)
+    : QWizard(parent)
+{
+    StrDebug();
 
-  bList = buyersList;
-  iList = invList;
-  addPage(new IntroPage);
-  addPage(new ClassInvoicePage(bList, iList));
-  addPage(new EmailPage);
-  addPage(new ConclusionPage);
+    bList = buyersList;
+    iList = invList;
+    addPage(new IntroPage);
+    addPage(new ClassInvoicePage(bList, iList));
+    addPage(new EmailPage);
+    addPage(new ConclusionPage);
 
-  setWindowTitle(trUtf8("Generowanie wiadomości"));
+    setWindowTitle(trUtf8("Generowanie wiadomości"));
 }
 
 // accepts end of QWizard
-void Send::accept() { QDialog::accept(); }
+void Send::accept()
+{
+    QDialog::accept();
+}
 
 // First page of QWizard with Intro
-IntroPage::IntroPage(QWidget *parent) : QWizardPage(parent) {
+IntroPage::IntroPage(QWidget *parent)
+    : QWizardPage(parent)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
+    setTitle(trUtf8("Wprowadzenie"));
 
-  setTitle(trUtf8("Wprowadzenie"));
+    label =
+        new QLabel(trUtf8("Generator pomoże w kolejnych krokach wysłać"
+                          " e-mail z opcją wybierania kontrahenta oraz "
+                          "faktury. Istnieje możliwość dodania jednego "
+                          "z kilku szablonów tekstowych jako treść wiadomości."));
+    label->setWordWrap(true);
 
-  label =
-      new QLabel(trUtf8("Generator pomoże w kolejnych krokach wysłać"
-                        " e-mail z opcją wybierania kontrahenta oraz "
-                        "faktury. Istnieje możliwość dodania jednego "
-                        "z kilku szablonów tekstowych jako treść wiadomości."));
-  label->setWordWrap(true);
-
-  QVBoxLayout *layout = new QVBoxLayout;
-  layout->addWidget(label);
-  setLayout(layout);
+    QVBoxLayout *layout = new QVBoxLayout;
+    layout->addWidget(label);
+    setLayout(layout);
 }
 
 // Second page with invoice choice
-ClassInvoicePage::ClassInvoicePage(QVector<BuyerData> buyList,
-                                   QVector<InvoiceData> invList,
-                                   QWidget *parent)
-    : QWizardPage(parent) {
+ClassInvoicePage::ClassInvoicePage(
+    QVector<BuyerData> buyList,
+    QVector<InvoiceData> invList,
+    QWidget *parent)
+    : QWizardPage(parent)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
+    setTitle(tr("Wybieranie danych"));
+    setSubTitle(tr("Wybierz jednego z kontrahentów oraz fakturę jako załącznik"));
+    bList = buyList;
+    iList = invList;
 
-  setTitle(tr("Wybieranie danych"));
-  setSubTitle(tr("Wybierz jednego z kontrahentów oraz fakturę jako załącznik"));
-  bList = buyList;
-  iList = invList;
+    QHBoxLayout *mainHLayout = new QHBoxLayout();
+    QVBoxLayout *secondVLayout = new QVBoxLayout();
 
-  QHBoxLayout *mainHLayout = new QHBoxLayout();
-  QVBoxLayout *secondVLayout = new QVBoxLayout();
+    QLabel *invoices = new QLabel;
+    invoices->setText(trUtf8("Wybierz fakturę"));
 
-  QLabel *invoices = new QLabel;
-  invoices->setText(trUtf8("Wybierz fakturę"));
+    invoicesList = new QTableWidget();
+    invoicesList->setRowCount(iList.size());
+    invoicesList->setColumnCount(5);
+    invoicesList->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    invoicesList->setHorizontalHeaderLabels(
+        QStringList() << trUtf8("Symbol") << trUtf8("Data") << trUtf8("Typ") << trUtf8("Nabywca")
+                      << trUtf8("NIP"));
 
-  invoicesList = new QTableWidget();
-  invoicesList->setRowCount(iList.size());
-  invoicesList->setColumnCount(5);
-  invoicesList->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-  invoicesList->setHorizontalHeaderLabels(
-      QStringList() << trUtf8("Symbol") << trUtf8("Data") << trUtf8("Typ")
-                    << trUtf8("Nabywca") << trUtf8("NIP"));
+    for (int i = 0; i < iList.size(); ++i)
+    {
+        invoicesList->setItem(i, 0, new QTableWidgetItem(iList.at(i).invNr));
+        invoicesList->setItem(
+            i, 1, new QTableWidgetItem(iList.at(i).sellingDate.toString("dd/MM/yyyy")));
+        invoicesList->setItem(i, 2, new QTableWidgetItem(iList.at(i).type));
+        invoicesList->setItem(i, 3, new QTableWidgetItem(iList.at(i).custName));
+        invoicesList->setItem(i, 4, new QTableWidgetItem(iList.at(i).custTic));
+    }
 
-  for (int i = 0; i < iList.size(); ++i) {
+    secondVLayout->addWidget(invoices);
+    secondVLayout->addWidget(invoicesList);
 
-    invoicesList->setItem(i, 0, new QTableWidgetItem(iList.at(i).invNr));
-    invoicesList->setItem(
-        i, 1,
-        new QTableWidgetItem(iList.at(i).sellingDate.toString("dd/MM/yyyy")));
-    invoicesList->setItem(i, 2, new QTableWidgetItem(iList.at(i).type));
-    invoicesList->setItem(i, 3, new QTableWidgetItem(iList.at(i).custName));
-    invoicesList->setItem(i, 4, new QTableWidgetItem(iList.at(i).custTic));
-  }
+    mainHLayout->addLayout(secondVLayout);
 
-  secondVLayout->addWidget(invoices);
-  secondVLayout->addWidget(invoicesList);
-
-  mainHLayout->addLayout(secondVLayout);
-
-  setLayout(mainHLayout);
+    setLayout(mainHLayout);
 }
 
 // "This virtual function is called by QWizard::validateCurrentPage() when the
@@ -111,704 +123,770 @@ ClassInvoicePage::ClassInvoicePage(QVector<BuyerData> buyList,
 // If it returns true, the next page is shown (or the wizard finishes);
 // otherwise, the current page stays up." From
 // http://doc.qt.io/qt-5/qwizardpage.html#validatePage
-bool ClassInvoicePage::validatePage() {
+bool ClassInvoicePage::validatePage()
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
+    // extra for registerField. See table on
+    // http://doc.qt.io/qt-5/qwizardpage.html#registerField
+    QLineEdit *QLineEmail = new QLineEdit;
+    QLineEdit *QLineName = new QLineEdit;
+    QLineEdit *QLineSymbol = new QLineEdit;
+    QLineEdit *QLineType = new QLineEdit;
+    QLineEdit *QLineCurr = new QLineEdit;
+    QLineEdit *QLineShortType = new QLineEdit;
+    QLineEdit *QLineFileName = new QLineEdit;
 
-  // extra for registerField. See table on
-  // http://doc.qt.io/qt-5/qwizardpage.html#registerField
-  QLineEdit *QLineEmail = new QLineEdit;
-  QLineEdit *QLineName = new QLineEdit;
-  QLineEdit *QLineSymbol = new QLineEdit;
-  QLineEdit *QLineType = new QLineEdit;
-  QLineEdit *QLineCurr = new QLineEdit;
-  QLineEdit *QLineShortType = new QLineEdit;
-  QLineEdit *QLineFileName = new QLineEdit;
-
-  if (invoicesList->currentRow() >= 0) {
-
-    for (int i = 0; i < bList.size(); ++i) {
-
-      if (invoicesList->item(invoicesList->currentRow(), 3)->text() ==
-              bList.at(i).name &&
-          invoicesList->item(invoicesList->currentRow(), 4)->text() ==
-              bList.at(i).tic) {
-
-        QLineEmail->setText(bList.at(i).email);
-      }
-    }
-
-    double res = 0;
-    QString name = QString();
-
-    for (int i = 0; i < iList.size(); ++i) {
-
-      if (invoicesList->item(invoicesList->currentRow(), 3)->text() ==
-              iList.at(i).custName &&
-          invoicesList->item(invoicesList->currentRow(), 4)->text() ==
-              iList.at(i).custTic &&
-          invoicesList->item(invoicesList->currentRow(), 0)->text() ==
-              iList.at(i).invNr) {
-
-        name = iList.at(i).id;
-
-        QDomDocument doc(sett().getInoiveDocName());
-        QDomElement root;
-        QDomElement purchaser;
-        QDomElement product;
-        QString fName = name;
-
-        QFile file(sett().getInvoicesDir() + fName);
-        QLineFileName->setText(file.fileName());
-
-        if (!file.open(QIODevice::ReadOnly)) {
-
-          qDebug("file doesn't exist");
-
-        } else {
-
-          QTextStream stream(&file);
-
-          if (!doc.setContent(stream.readAll())) {
-            qDebug("You can't read content from invoice");
-            file.close();
-          }
+    if (invoicesList->currentRow() >= 0)
+    {
+        for (int i = 0; i < bList.size(); ++i)
+        {
+            if (invoicesList->item(invoicesList->currentRow(), 3)->text() == bList.at(i).name
+                && invoicesList->item(invoicesList->currentRow(), 4)->text() == bList.at(i).tic)
+            {
+                QLineEmail->setText(bList.at(i).email);
+            }
         }
 
-        root = doc.documentElement();
-        QLineSymbol->setText(root.attribute("no"));
-        QDomNode tmp;
-        tmp = root.firstChild();
-        tmp = tmp.toElement().nextSibling(); // purchaser
-        purchaser = tmp.toElement();
+        double res = 0;
+        QString name = QString();
 
-        tmp = tmp.toElement().nextSibling(); // product
-        product = tmp.toElement();
+        for (int i = 0; i < iList.size(); ++i)
+        {
+            if (invoicesList->item(invoicesList->currentRow(), 3)->text() == iList.at(i).custName
+                && invoicesList->item(invoicesList->currentRow(), 4)->text() == iList.at(i).custTic
+                && invoicesList->item(invoicesList->currentRow(), 0)->text() == iList.at(i).invNr)
+            {
+                name = iList.at(i).id;
 
-        int goodsCount = product.childNodes().count();
-        qDebug() << QString::number(goodsCount);
-        int x = 0;
-        QDomElement good;
-        good = product.firstChild().toElement();
+                QDomDocument doc(sett().getInoiveDocName());
+                QDomElement root;
+                QDomElement purchaser;
+                QDomElement product;
+                QString fName = name;
 
-        static const char *goodsColumns[] = {
-            "id",       "name",         "code",     "PKWiU",
-            "quantity", "quantityType", "discount", "price",
-            "nett",     "vatBucket",    "gross"};
+                QFile file(sett().getInvoicesDir() + fName);
+                QLineFileName->setText(file.fileName());
 
-        for (x = 0; x < goodsCount; ++x) {
+                if (!file.open(QIODevice::ReadOnly))
+                {
+                    qDebug("file doesn't exist");
+                }
+                else
+                {
+                    QTextStream stream(&file);
 
-          double decimalPointsAmount1 =
-              good.attribute(goodsColumns[10]).right(2).toInt() * 0.01;
-          res += sett().stringToDouble(good.attribute(goodsColumns[10]));
-          res += decimalPointsAmount1;
-          if (good.nextSibling().toElement().tagName() == "product")
-            good = good.nextSibling().toElement();
-          else
-            break;
+                    if (!doc.setContent(stream.readAll()))
+                    {
+                        qDebug("You can't read content from invoice");
+                        file.close();
+                    }
+                }
+
+                root = doc.documentElement();
+                QLineSymbol->setText(root.attribute("no"));
+                QDomNode tmp;
+                tmp = root.firstChild();
+                tmp = tmp.toElement().nextSibling(); // purchaser
+                purchaser = tmp.toElement();
+
+                tmp = tmp.toElement().nextSibling(); // product
+                product = tmp.toElement();
+
+                int goodsCount = product.childNodes().count();
+                qDebug() << QString::number(goodsCount);
+                int x = 0;
+                QDomElement good;
+                good = product.firstChild().toElement();
+
+                static const char *goodsColumns[] = { "id",        "name",     "code",
+                                                      "PKWiU",     "quantity", "quantityType",
+                                                      "discount",  "price",    "nett",
+                                                      "vatBucket", "gross" };
+
+                for (x = 0; x < goodsCount; ++x)
+                {
+                    double decimalPointsAmount1 =
+                        good.attribute(goodsColumns[10]).right(2).toInt() * 0.01;
+                    res += sett().stringToDouble(good.attribute(goodsColumns[10]));
+                    res += decimalPointsAmount1;
+                    if (good.nextSibling().toElement().tagName() == "product")
+                        good = good.nextSibling().toElement();
+                    else
+                        break;
+                }
+
+                tmp = tmp.toElement().nextSibling();
+                QDomElement additional = tmp.toElement();
+
+                QLineCurr->setText(additional.attribute("currency"));
+
+                file.close();
+
+                QLineType->setText(transformType(iList.at(i).type));
+                QLineShortType->setText(iList.at(i).type);
+            }
         }
 
-        tmp = tmp.toElement().nextSibling();
-        QDomElement additional = tmp.toElement();
+        QLineName->setText(invoicesList->item(invoicesList->currentRow(), 3)->text());
+        QLineSymbol->setText(invoicesList->item(invoicesList->currentRow(), 0)->text());
+        QLineEdit *sumD = new QLineEdit;
+        sumD->setText(sett().numberToString(res));
 
-        QLineCurr->setText(additional.attribute("currency"));
+        registerField("emailData", QLineEmail);
+        registerField("nameData", QLineName);
+        registerField("symbolData", QLineSymbol);
+        registerField("sumData", sumD);
+        registerField("invtypeData", QLineType);
+        registerField("invTypeShort", QLineShortType);
+        registerField("currData", QLineCurr);
+        registerField("filenameData", QLineFileName);
 
-        file.close();
-
-        QLineType->setText(transformType(iList.at(i).type));
-        QLineShortType->setText(iList.at(i).type);
-      }
+        return true;
     }
-
-    QLineName->setText(
-        invoicesList->item(invoicesList->currentRow(), 3)->text());
-    QLineSymbol->setText(
-        invoicesList->item(invoicesList->currentRow(), 0)->text());
-    QLineEdit *sumD = new QLineEdit;
-    sumD->setText(sett().numberToString(res));
-
-    registerField("emailData", QLineEmail);
-    registerField("nameData", QLineName);
-    registerField("symbolData", QLineSymbol);
-    registerField("sumData", sumD);
-    registerField("invtypeData", QLineType);
-    registerField("invTypeShort", QLineShortType);
-    registerField("currData", QLineCurr);
-    registerField("filenameData", QLineFileName);
-
-    return true;
-  } else {
-
-    return false;
-  }
+    else
+    {
+        return false;
+    }
 }
 
 // transform short types to normal text for email message
-QString ClassInvoicePage::transformType(QString text) {
+QString ClassInvoicePage::transformType(QString text)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
+    if (text == "FVAT")
+        return s_INVOICE;
+    if (text == "FPro")
+        return s_PROFORMA;
+    if (text == "korekta")
+        return s_CORRECTION;
+    if (text == "FBrutto")
+        return s_FBRUTTO;
+    if (text == "kbrutto")
+        return s_FBRUTTO;
+    if (text == "rachunek")
+        return s_BILL;
+    if (text == "duplikat")
+        return s_DUPLICATE;
+    if (text == "RR")
+        return s_RR;
 
-  if (text == "FVAT")
     return s_INVOICE;
-  if (text == "FPro")
-    return s_PROFORMA;
-  if (text == "korekta")
-    return s_CORRECTION;
-  if (text == "FBrutto")
-    return s_FBRUTTO;
-  if (text == "kbrutto")
-    return s_FBRUTTO;
-  if (text == "rachunek")
-    return s_BILL;
-  if (text == "duplikat")
-    return s_DUPLICATE;
-  if (text == "RR")
-    return s_RR;
-
-  return s_INVOICE;
 }
 
 // Third page for helping choice of host and protocol for email account
-EmailPage::EmailPage(QWidget *parent) : QWizardPage(parent) {
+EmailPage::EmailPage(QWidget *parent)
+    : QWizardPage(parent)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
+    setTitle(tr("Generowanie host"));
+    setSubTitle(
+        tr("Wybierz swój host po lewej stronie poniżej, do którego należy twoja "
+           "skrzynka pocztowa, a z której chcesz wysłać wiadomość do kontrahenta."
+           " Po prawej wybierz jeden z portów. W przypadku zaznaczenia "
+           "nieobsługiwanego portu dla twojego konta pocztowego zostaniesz o tym "
+           "poinformowany. Możesz także wprowadzić własne dane bez zaznaczania."));
 
-  setTitle(tr("Generowanie host"));
-  setSubTitle(tr(
-      "Wybierz swój host po lewej stronie poniżej, do którego należy twoja "
-      "skrzynka pocztowa, a z której chcesz wysłać wiadomość do kontrahenta."
-      " Po prawej wybierz jeden z portów. W przypadku zaznaczenia "
-      "nieobsługiwanego portu dla twojego konta pocztowego zostaniesz o tym "
-      "poinformowany. Możesz także wprowadzić własne dane bez zaznaczania."));
+    QHBoxLayout *mainL = new QHBoxLayout;
+    QVBoxLayout *labLay = new QVBoxLayout;
+    QVBoxLayout *datLay = new QVBoxLayout;
 
-  QHBoxLayout *mainL = new QHBoxLayout;
-  QVBoxLayout *labLay = new QVBoxLayout;
-  QVBoxLayout *datLay = new QVBoxLayout;
+    QLabel *lab1 = new QLabel;
+    lab1->setText(trUtf8("Host: "));
 
-  QLabel *lab1 = new QLabel;
-  lab1->setText(trUtf8("Host: "));
+    QLabel *lab2 = new QLabel;
+    lab2->setText(trUtf8("Port: "));
 
-  QLabel *lab2 = new QLabel;
-  lab2->setText(trUtf8("Port: "));
+    labLay->addWidget(lab1);
+    labLay->addWidget(lab2);
 
-  labLay->addWidget(lab1);
-  labLay->addWidget(lab2);
+    editCos = new QLineEdit;
+    lab1->setBuddy(editCos);
 
-  editCos = new QLineEdit;
-  lab1->setBuddy(editCos);
+    edit2 = new QLineEdit;
+    lab2->setBuddy(edit2);
 
-  edit2 = new QLineEdit;
-  lab2->setBuddy(edit2);
+    datLay->addWidget(editCos);
+    datLay->addWidget(edit2);
 
-  datLay->addWidget(editCos);
-  datLay->addWidget(edit2);
+    mainL->addLayout(labLay);
+    mainL->addLayout(datLay);
 
-  mainL->addLayout(labLay);
-  mainL->addLayout(datLay);
+    QHBoxLayout *mainLSmtp = new QHBoxLayout;
+    QVBoxLayout *labLay2 = new QVBoxLayout;
+    QVBoxLayout *datLay2 = new QVBoxLayout;
 
-  QHBoxLayout *mainLSmtp = new QHBoxLayout;
-  QVBoxLayout *labLay2 = new QVBoxLayout;
-  QVBoxLayout *datLay2 = new QVBoxLayout;
+    groupBox = new QGroupBox(trUtf8("&Lista skrzynek pocztowych"));
+    QVBoxLayout *groupBoxLayout = new QVBoxLayout;
 
-  groupBox = new QGroupBox(trUtf8("&Lista skrzynek pocztowych"));
-  QVBoxLayout *groupBoxLayout = new QVBoxLayout;
+    QRadioButton *radioButton1 = new QRadioButton(trUtf8("&Gmail"));
+    radioButton1->setCheckable(true);
+    QRadioButton *radioButton2 = new QRadioButton(trUtf8("o&2"));
+    radioButton2->setCheckable(true);
+    QRadioButton *radioButton3 = new QRadioButton(trUtf8("&Interia"));
+    radioButton3->setCheckable(true);
+    QRadioButton *radioButton4 = new QRadioButton(trUtf8("O&net"));
+    radioButton4->setCheckable(true);
+    QRadioButton *radioButton5 = new QRadioButton(trUtf8("&WP"));
+    radioButton5->setCheckable(true);
+    QRadioButton *radioButton6 = new QRadioButton(trUtf8("Y&ahoo"));
+    radioButton6->setCheckable(true);
+    QRadioButton *radioButton7 = new QRadioButton(trUtf8("&HotMail (stare serwery)"));
+    radioButton7->setCheckable(true);
+    QRadioButton *radioButton8 = new QRadioButton(trUtf8("G&azeta"));
+    radioButton8->setCheckable(true);
+    QRadioButton *radioButton9 = new QRadioButton(trUtf8("&Aol"));
+    radioButton9->setCheckable(true);
+    QRadioButton *radioButton10 = new QRadioButton(trUtf8("F&oxmail / QQMail"));
+    radioButton10->setCheckable(true);
+    QRadioButton *radioButton11 = new QRadioButton(trUtf8("&Outlook"));
+    radioButton11->setCheckable(true);
 
-  QRadioButton *radioButton1 = new QRadioButton(trUtf8("&Gmail"));
-  radioButton1->setCheckable(true);
-  QRadioButton *radioButton2 = new QRadioButton(trUtf8("o&2"));
-  radioButton2->setCheckable(true);
-  QRadioButton *radioButton3 = new QRadioButton(trUtf8("&Interia"));
-  radioButton3->setCheckable(true);
-  QRadioButton *radioButton4 = new QRadioButton(trUtf8("O&net"));
-  radioButton4->setCheckable(true);
-  QRadioButton *radioButton5 = new QRadioButton(trUtf8("&WP"));
-  radioButton5->setCheckable(true);
-  QRadioButton *radioButton6 = new QRadioButton(trUtf8("Y&ahoo"));
-  radioButton6->setCheckable(true);
-  QRadioButton *radioButton7 =
-      new QRadioButton(trUtf8("&HotMail (stare serwery)"));
-  radioButton7->setCheckable(true);
-  QRadioButton *radioButton8 = new QRadioButton(trUtf8("G&azeta"));
-  radioButton8->setCheckable(true);
-  QRadioButton *radioButton9 = new QRadioButton(trUtf8("&Aol"));
-  radioButton9->setCheckable(true);
-  QRadioButton *radioButton10 = new QRadioButton(trUtf8("F&oxmail / QQMail"));
-  radioButton10->setCheckable(true);
-  QRadioButton *radioButton11 = new QRadioButton(trUtf8("&Outlook"));
-  radioButton11->setCheckable(true);
+    connect(radioButton1, &QAbstractButton::toggled, this, &EmailPage::setGmail);
+    connect(radioButton2, &QAbstractButton::toggled, this, &EmailPage::seto2);
+    connect(radioButton3, &QAbstractButton::toggled, this, &EmailPage::setInteria);
+    connect(radioButton4, &QAbstractButton::toggled, this, &EmailPage::setOnet);
+    connect(radioButton5, &QAbstractButton::toggled, this, &EmailPage::setWP);
+    connect(radioButton6, &QAbstractButton::toggled, this, &EmailPage::setYahoo);
+    connect(radioButton7, &QAbstractButton::toggled, this, &EmailPage::setHotMail);
+    connect(radioButton8, &QAbstractButton::toggled, this, &EmailPage::setGazeta);
+    connect(radioButton9, &QAbstractButton::toggled, this, &EmailPage::setAol);
+    connect(radioButton10, &QAbstractButton::toggled, this, &EmailPage::setFoxMail);
+    connect(radioButton11, &QAbstractButton::toggled, this, &EmailPage::setOutlook);
 
-  connect(radioButton1, &QAbstractButton::toggled, this, &EmailPage::setGmail);
-  connect(radioButton2, &QAbstractButton::toggled, this, &EmailPage::seto2);
-  connect(radioButton3, &QAbstractButton::toggled, this,
-          &EmailPage::setInteria);
-  connect(radioButton4, &QAbstractButton::toggled, this, &EmailPage::setOnet);
-  connect(radioButton5, &QAbstractButton::toggled, this, &EmailPage::setWP);
-  connect(radioButton6, &QAbstractButton::toggled, this, &EmailPage::setYahoo);
-  connect(radioButton7, &QAbstractButton::toggled, this,
-          &EmailPage::setHotMail);
-  connect(radioButton8, &QAbstractButton::toggled, this, &EmailPage::setGazeta);
-  connect(radioButton9, &QAbstractButton::toggled, this, &EmailPage::setAol);
-  connect(radioButton10, &QAbstractButton::toggled, this,
-          &EmailPage::setFoxMail);
-  connect(radioButton11, &QAbstractButton::toggled, this,
-          &EmailPage::setOutlook);
+    groupBoxLayout->addWidget(radioButton1);
+    groupBoxLayout->addWidget(radioButton2);
+    groupBoxLayout->addWidget(radioButton3);
+    groupBoxLayout->addWidget(radioButton4);
+    groupBoxLayout->addWidget(radioButton5);
+    groupBoxLayout->addWidget(radioButton6);
+    groupBoxLayout->addWidget(radioButton7);
+    groupBoxLayout->addWidget(radioButton8);
+    groupBoxLayout->addWidget(radioButton9);
+    groupBoxLayout->addWidget(radioButton10);
+    groupBoxLayout->addWidget(radioButton11);
 
-  groupBoxLayout->addWidget(radioButton1);
-  groupBoxLayout->addWidget(radioButton2);
-  groupBoxLayout->addWidget(radioButton3);
-  groupBoxLayout->addWidget(radioButton4);
-  groupBoxLayout->addWidget(radioButton5);
-  groupBoxLayout->addWidget(radioButton6);
-  groupBoxLayout->addWidget(radioButton7);
-  groupBoxLayout->addWidget(radioButton8);
-  groupBoxLayout->addWidget(radioButton9);
-  groupBoxLayout->addWidget(radioButton10);
-  groupBoxLayout->addWidget(radioButton11);
+    groupBox->setLayout(groupBoxLayout);
+    labLay2->addWidget(groupBox);
 
-  groupBox->setLayout(groupBoxLayout);
-  labLay2->addWidget(groupBox);
+    // -----------
 
-  // -----------
+    QGroupBox *groupBox2 = new QGroupBox(trUtf8("&Lista protokołów"));
+    QVBoxLayout *groupBoxLayout2 = new QVBoxLayout;
 
-  QGroupBox *groupBox2 = new QGroupBox(trUtf8("&Lista protokołów"));
-  QVBoxLayout *groupBoxLayout2 = new QVBoxLayout;
+    QRadioButton *radioButton1_1 = new QRadioButton(trUtf8("&SSL"));
+    radioButton1_1->setCheckable(true);
+    QRadioButton *radioButton2_2 = new QRadioButton(trUtf8("T&CP"));
+    radioButton2_2->setCheckable(true);
+    QRadioButton *radioButton3_3 = new QRadioButton(trUtf8("&TLS"));
+    radioButton3_3->setCheckable(true);
 
-  QRadioButton *radioButton1_1 = new QRadioButton(trUtf8("&SSL"));
-  radioButton1_1->setCheckable(true);
-  QRadioButton *radioButton2_2 = new QRadioButton(trUtf8("T&CP"));
-  radioButton2_2->setCheckable(true);
-  QRadioButton *radioButton3_3 = new QRadioButton(trUtf8("&TLS"));
-  radioButton3_3->setCheckable(true);
+    connect(radioButton1_1, &QAbstractButton::toggled, this, &EmailPage::setSSL);
+    connect(radioButton2_2, &QAbstractButton::toggled, this, &EmailPage::setTCP);
+    connect(radioButton3_3, &QAbstractButton::toggled, this, &EmailPage::setTLS);
 
-  connect(radioButton1_1, &QAbstractButton::toggled, this, &EmailPage::setSSL);
-  connect(radioButton2_2, &QAbstractButton::toggled, this, &EmailPage::setTCP);
-  connect(radioButton3_3, &QAbstractButton::toggled, this, &EmailPage::setTLS);
+    groupBoxLayout2->addWidget(radioButton1_1);
+    groupBoxLayout2->addWidget(radioButton2_2);
+    groupBoxLayout2->addWidget(radioButton3_3);
 
-  groupBoxLayout2->addWidget(radioButton1_1);
-  groupBoxLayout2->addWidget(radioButton2_2);
-  groupBoxLayout2->addWidget(radioButton3_3);
+    groupBox2->setLayout(groupBoxLayout2);
+    datLay2->addWidget(groupBox2);
 
-  groupBox2->setLayout(groupBoxLayout2);
-  datLay2->addWidget(groupBox2);
+    mainLSmtp->addLayout(labLay2);
+    mainLSmtp->addLayout(datLay2);
 
-  mainLSmtp->addLayout(labLay2);
-  mainLSmtp->addLayout(datLay2);
+    registerField("host", editCos);
+    registerField("port", edit2);
 
-  registerField("host", editCos);
-  registerField("port", edit2);
+    label = new QLabel;
+    label->setWordWrap(true);
 
-  label = new QLabel;
-  label->setWordWrap(true);
-
-  QVBoxLayout *layout = new QVBoxLayout;
-  layout->addLayout(mainL);
-  layout->addLayout(mainLSmtp);
-  layout->addWidget(label);
-  setLayout(layout);
+    QVBoxLayout *layout = new QVBoxLayout;
+    layout->addLayout(mainL);
+    layout->addLayout(mainLSmtp);
+    layout->addWidget(label);
+    setLayout(layout);
 }
 
 // what's going on before page is shown
-void EmailPage::initializePage() {
+void EmailPage::initializePage()
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  checkedMailButton = false;
-  protocol = QString();
-  checkedMail = QString();
-  checkedPortButton = false;
+    checkedMailButton = false;
+    protocol = QString();
+    checkedMail = QString();
+    checkedPortButton = false;
 }
 
 // what's going on when QRadioButtons (with host names and protocols) are
 // checked
-void EmailPage::setHostPort(QString checked, QString protocol) {
+void EmailPage::setHostPort(QString checked, QString protocol)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
+    if (checked == "Gmail")
+    {
+        editCos->setText("smtp.gmail.com");
 
-  if (checked == "Gmail") {
-    editCos->setText("smtp.gmail.com");
-
-    if (protocol == "SSL")
-      edit2->setText("465");
-    else if (protocol == "TCP") {
-      this->protocol = "";
-      edit2->setText("");
-      QMessageBox::information(this, "Protokół",
-                               "Do wysłania wiadomości z tej "
-                               "skrzynki pocztowej wybierz "
-                               "protokół SSL lub TLS.");
-    } else if (protocol == "TLS")
-      edit2->setText("587");
-  } else if (checked == "Onet") {
-    editCos->setText("smtp.poczta.onet.pl");
-
-    if (protocol == "SSL")
-      edit2->setText("465");
-    else if (protocol == "TCP") {
-      this->protocol = "";
-      edit2->setText("");
-      QMessageBox::information(this, "Protokół",
-                               "Do wysłania wiadomości z tej "
-                               "skrzynki pocztowej wybierz "
-                               "protokół SSL lub TLS.");
-    } else if (protocol == "TLS")
-      edit2->setText("587");
-  } else if (checked == "o2") {
-    editCos->setText("poczta.o2.pl");
-
-    if (protocol == "SSL")
-      edit2->setText("465");
-    else if (protocol == "TCP") {
-      this->protocol = "";
-      edit2->setText("");
-      QMessageBox::information(this, "Protokół",
-                               "Do wysłania wiadomości z tej "
-                               "skrzynki pocztowej wybierz "
-                               "protokół SSL lub TLS.");
-    } else if (protocol == "TLS")
-      edit2->setText("587");
-  } else if (checked == "Interia") {
-    editCos->setText("poczta.interia.pl");
-
-    if (protocol == "SSL")
-      edit2->setText("465");
-    else if (protocol == "TCP") {
-      this->protocol = "";
-      edit2->setText("");
-      QMessageBox::information(this, "Protokół",
-                               "Do wysłania wiadomości z tej "
-                               "skrzynki pocztowej wybierz "
-                               "protokół SSL lub TLS.");
-    } else if (protocol == "TLS")
-      edit2->setText("587");
-  } else if (checked == "WP") {
-    editCos->setText("smtp.wp.pl");
-
-    if (protocol == "SSL")
-      edit2->setText("465");
-    else if (protocol == "TCP") {
-      this->protocol = "";
-      edit2->setText("");
-      QMessageBox::information(this, "Protokół",
-                               "Do wysłania wiadomości z tej "
-                               "skrzynki pocztowej wybierz "
-                               "protokół SSL lub TLS.");
-    } else if (protocol == "TLS")
-      edit2->setText("587");
-  } else if (checked == "Yahoo") {
-    editCos->setText("smtp.mail.yahoo.com");
-
-    if (protocol == "SSL")
-      edit2->setText("465");
-    else if (protocol == "TCP") {
-      this->protocol = "";
-      edit2->setText("");
-      QMessageBox::information(this, "Protokół",
-                               "Do wysłania wiadomości z tej "
-                               "skrzynki pocztowej wybierz "
-                               "protokół SSL lub TLS.");
-    } else if (protocol == "TLS")
-      edit2->setText("587");
-  } else if (checked == "Outlook") {
-    editCos->setText("smtp-mail.outlook.com");
-
-    if (protocol == "SSL") {
-      this->protocol = "";
-      edit2->setText("");
-      QMessageBox::information(this, "Protokół",
-                               "Do wysłania wiadomości z tej "
-                               "skrzynki pocztowej wybierz "
-                               "protokół TLS lub TCP.");
-    } else if (protocol == "TCP")
-      edit2->setText("25");
-    else if (protocol == "TLS")
-      edit2->setText("587");
-  } else if (checked == "Foxmail / QQMail") {
-    editCos->setText("smtp.qq.com");
-
-    if (protocol == "SSL")
-      edit2->setText("465");
-    else if (protocol == "TCP")
-      edit2->setText("25");
-    else if (protocol == "TLS")
-      edit2->setText("587");
-  } else if (checked == "Aol") {
-    editCos->setText("smtp.aol.com");
-
-    if (protocol == "SSL") {
-      this->protocol = "";
-      edit2->setText("");
-      QMessageBox::information(this, "Protokół",
-                               "Do wysłania wiadomości z tej "
-                               "skrzynki pocztowej wybierz "
-                               "protokół TLS.");
-    } else if (protocol == "TCP") {
-      this->protocol = "";
-      edit2->setText("");
-      QMessageBox::information(this, "Protokół",
-                               "Do wysłania wiadomości z tej "
-                               "skrzynki pocztowej wybierz "
-                               "protokół TLS.");
-    } else if (protocol == "TLS")
-      edit2->setText("587");
-  } else if (checked == "Gazeta") {
-    editCos->setText("smtp.gazeta.pl");
-
-    if (protocol == "SSL")
-      edit2->setText("465");
-    else if (protocol == "TCP") {
-      this->protocol = "";
-      edit2->setText("");
-      QMessageBox::information(this, "Protokół",
-                               "Do wysłania wiadomości z tej "
-                               "skrzynki pocztowej wybierz "
-                               "protokół SSL.");
-    } else if (protocol == "TLS") {
-      this->protocol = "";
-      edit2->setText("");
-      QMessageBox::information(this, "Protokół",
-                               "Do wysłania wiadomości z tej "
-                               "skrzynki pocztowej wybierz "
-                               "protokół SSL.");
+        if (protocol == "SSL")
+            edit2->setText("465");
+        else if (protocol == "TCP")
+        {
+            this->protocol = "";
+            edit2->setText("");
+            QMessageBox::information(
+                this,
+                "Protokół",
+                "Do wysłania wiadomości z tej "
+                "skrzynki pocztowej wybierz "
+                "protokół SSL lub TLS.");
+        }
+        else if (protocol == "TLS")
+            edit2->setText("587");
     }
-  } else if (checked == "HotMail (stare serwery)") {
-    editCos->setText("smtp.live.com");
+    else if (checked == "Onet")
+    {
+        editCos->setText("smtp.poczta.onet.pl");
 
-    if (protocol == "SSL") {
-      this->protocol = "";
-      edit2->setText("");
-      QMessageBox::information(this, "Protokół",
-                               "Do wysłania wiadomości z tej "
-                               "skrzynki pocztowej wybierz "
-                               "protokół TLS.");
-    } else if (protocol == "TCP") {
-      this->protocol = "";
-      edit2->setText("");
-      QMessageBox::information(this, "Protokół",
-                               "Do wysłania wiadomości z tej "
-                               "skrzynki pocztowej wybierz "
-                               "protokół TLS.");
-    } else if (protocol == "TLS")
-      edit2->setText("587");
-  }
+        if (protocol == "SSL")
+            edit2->setText("465");
+        else if (protocol == "TCP")
+        {
+            this->protocol = "";
+            edit2->setText("");
+            QMessageBox::information(
+                this,
+                "Protokół",
+                "Do wysłania wiadomości z tej "
+                "skrzynki pocztowej wybierz "
+                "protokół SSL lub TLS.");
+        }
+        else if (protocol == "TLS")
+            edit2->setText("587");
+    }
+    else if (checked == "o2")
+    {
+        editCos->setText("poczta.o2.pl");
+
+        if (protocol == "SSL")
+            edit2->setText("465");
+        else if (protocol == "TCP")
+        {
+            this->protocol = "";
+            edit2->setText("");
+            QMessageBox::information(
+                this,
+                "Protokół",
+                "Do wysłania wiadomości z tej "
+                "skrzynki pocztowej wybierz "
+                "protokół SSL lub TLS.");
+        }
+        else if (protocol == "TLS")
+            edit2->setText("587");
+    }
+    else if (checked == "Interia")
+    {
+        editCos->setText("poczta.interia.pl");
+
+        if (protocol == "SSL")
+            edit2->setText("465");
+        else if (protocol == "TCP")
+        {
+            this->protocol = "";
+            edit2->setText("");
+            QMessageBox::information(
+                this,
+                "Protokół",
+                "Do wysłania wiadomości z tej "
+                "skrzynki pocztowej wybierz "
+                "protokół SSL lub TLS.");
+        }
+        else if (protocol == "TLS")
+            edit2->setText("587");
+    }
+    else if (checked == "WP")
+    {
+        editCos->setText("smtp.wp.pl");
+
+        if (protocol == "SSL")
+            edit2->setText("465");
+        else if (protocol == "TCP")
+        {
+            this->protocol = "";
+            edit2->setText("");
+            QMessageBox::information(
+                this,
+                "Protokół",
+                "Do wysłania wiadomości z tej "
+                "skrzynki pocztowej wybierz "
+                "protokół SSL lub TLS.");
+        }
+        else if (protocol == "TLS")
+            edit2->setText("587");
+    }
+    else if (checked == "Yahoo")
+    {
+        editCos->setText("smtp.mail.yahoo.com");
+
+        if (protocol == "SSL")
+            edit2->setText("465");
+        else if (protocol == "TCP")
+        {
+            this->protocol = "";
+            edit2->setText("");
+            QMessageBox::information(
+                this,
+                "Protokół",
+                "Do wysłania wiadomości z tej "
+                "skrzynki pocztowej wybierz "
+                "protokół SSL lub TLS.");
+        }
+        else if (protocol == "TLS")
+            edit2->setText("587");
+    }
+    else if (checked == "Outlook")
+    {
+        editCos->setText("smtp-mail.outlook.com");
+
+        if (protocol == "SSL")
+        {
+            this->protocol = "";
+            edit2->setText("");
+            QMessageBox::information(
+                this,
+                "Protokół",
+                "Do wysłania wiadomości z tej "
+                "skrzynki pocztowej wybierz "
+                "protokół TLS lub TCP.");
+        }
+        else if (protocol == "TCP")
+            edit2->setText("25");
+        else if (protocol == "TLS")
+            edit2->setText("587");
+    }
+    else if (checked == "Foxmail / QQMail")
+    {
+        editCos->setText("smtp.qq.com");
+
+        if (protocol == "SSL")
+            edit2->setText("465");
+        else if (protocol == "TCP")
+            edit2->setText("25");
+        else if (protocol == "TLS")
+            edit2->setText("587");
+    }
+    else if (checked == "Aol")
+    {
+        editCos->setText("smtp.aol.com");
+
+        if (protocol == "SSL")
+        {
+            this->protocol = "";
+            edit2->setText("");
+            QMessageBox::information(
+                this,
+                "Protokół",
+                "Do wysłania wiadomości z tej "
+                "skrzynki pocztowej wybierz "
+                "protokół TLS.");
+        }
+        else if (protocol == "TCP")
+        {
+            this->protocol = "";
+            edit2->setText("");
+            QMessageBox::information(
+                this,
+                "Protokół",
+                "Do wysłania wiadomości z tej "
+                "skrzynki pocztowej wybierz "
+                "protokół TLS.");
+        }
+        else if (protocol == "TLS")
+            edit2->setText("587");
+    }
+    else if (checked == "Gazeta")
+    {
+        editCos->setText("smtp.gazeta.pl");
+
+        if (protocol == "SSL")
+            edit2->setText("465");
+        else if (protocol == "TCP")
+        {
+            this->protocol = "";
+            edit2->setText("");
+            QMessageBox::information(
+                this,
+                "Protokół",
+                "Do wysłania wiadomości z tej "
+                "skrzynki pocztowej wybierz "
+                "protokół SSL.");
+        }
+        else if (protocol == "TLS")
+        {
+            this->protocol = "";
+            edit2->setText("");
+            QMessageBox::information(
+                this,
+                "Protokół",
+                "Do wysłania wiadomości z tej "
+                "skrzynki pocztowej wybierz "
+                "protokół SSL.");
+        }
+    }
+    else if (checked == "HotMail (stare serwery)")
+    {
+        editCos->setText("smtp.live.com");
+
+        if (protocol == "SSL")
+        {
+            this->protocol = "";
+            edit2->setText("");
+            QMessageBox::information(
+                this,
+                "Protokół",
+                "Do wysłania wiadomości z tej "
+                "skrzynki pocztowej wybierz "
+                "protokół TLS.");
+        }
+        else if (protocol == "TCP")
+        {
+            this->protocol = "";
+            edit2->setText("");
+            QMessageBox::information(
+                this,
+                "Protokół",
+                "Do wysłania wiadomości z tej "
+                "skrzynki pocztowej wybierz "
+                "protokół TLS.");
+        }
+        else if (protocol == "TLS")
+            edit2->setText("587");
+    }
 }
 
-void EmailPage::setSSL(bool) {
+void EmailPage::setSSL(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  if (!checkedMailButton)
-    QMessageBox::warning(
-        this, "Zaznaczenie skrzynki pocztowej",
-        "Zaznacz jeszcze jedną ze skrzynek pocztowych po lewej stronie.");
-  checkedPortButton = true;
-  protocol = "SSL";
-  if (checkedMailButton)
-    setHostPort(checkedMail, protocol);
+    if (!checkedMailButton)
+        QMessageBox::warning(
+            this,
+            "Zaznaczenie skrzynki pocztowej",
+            "Zaznacz jeszcze jedną ze skrzynek pocztowych po lewej stronie.");
+    checkedPortButton = true;
+    protocol = "SSL";
+    if (checkedMailButton)
+        setHostPort(checkedMail, protocol);
 }
 
-void EmailPage::setTCP(bool) {
+void EmailPage::setTCP(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  if (!checkedMailButton)
-    QMessageBox::warning(
-        this, "Zaznaczenie skrzynki pocztowej",
-        "Zaznacz jeszcze jedną ze skrzynek pocztowych po lewej stronie.");
-  checkedPortButton = true;
-  protocol = "TCP";
-  if (checkedMailButton)
-    setHostPort(checkedMail, protocol);
+    if (!checkedMailButton)
+        QMessageBox::warning(
+            this,
+            "Zaznaczenie skrzynki pocztowej",
+            "Zaznacz jeszcze jedną ze skrzynek pocztowych po lewej stronie.");
+    checkedPortButton = true;
+    protocol = "TCP";
+    if (checkedMailButton)
+        setHostPort(checkedMail, protocol);
 }
 
-void EmailPage::setTLS(bool) {
+void EmailPage::setTLS(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  if (!checkedMailButton)
-    QMessageBox::warning(
-        this, "Zaznaczenie skrzynki pocztowej",
-        "Zaznacz jeszcze jedną ze skrzynek pocztowych po lewej stronie.");
-  checkedPortButton = true;
-  protocol = "TLS";
-  if (checkedMailButton)
-    setHostPort(checkedMail, protocol);
+    if (!checkedMailButton)
+        QMessageBox::warning(
+            this,
+            "Zaznaczenie skrzynki pocztowej",
+            "Zaznacz jeszcze jedną ze skrzynek pocztowych po lewej stronie.");
+    checkedPortButton = true;
+    protocol = "TLS";
+    if (checkedMailButton)
+        setHostPort(checkedMail, protocol);
 }
 
-void EmailPage::setGmail(bool) {
+void EmailPage::setGmail(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  checkedMailButton = true;
-  checkedMail = "Gmail";
-  if (checkedPortButton)
-    setHostPort(checkedMail, protocol);
+    checkedMailButton = true;
+    checkedMail = "Gmail";
+    if (checkedPortButton)
+        setHostPort(checkedMail, protocol);
 }
 
-void EmailPage::setOnet(bool) {
+void EmailPage::setOnet(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  checkedMailButton = true;
-  checkedMail = "Onet";
-  if (checkedPortButton)
-    setHostPort(checkedMail, protocol);
+    checkedMailButton = true;
+    checkedMail = "Onet";
+    if (checkedPortButton)
+        setHostPort(checkedMail, protocol);
 }
 
-void EmailPage::seto2(bool) {
+void EmailPage::seto2(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  checkedMailButton = true;
-  checkedMail = "o2";
-  if (checkedPortButton)
-    setHostPort(checkedMail, protocol);
+    checkedMailButton = true;
+    checkedMail = "o2";
+    if (checkedPortButton)
+        setHostPort(checkedMail, protocol);
 }
 
-void EmailPage::setInteria(bool) {
+void EmailPage::setInteria(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  checkedMailButton = true;
-  checkedMail = "Interia";
-  if (checkedPortButton)
-    setHostPort(checkedMail, protocol);
+    checkedMailButton = true;
+    checkedMail = "Interia";
+    if (checkedPortButton)
+        setHostPort(checkedMail, protocol);
 }
 
-void EmailPage::setWP(bool) {
+void EmailPage::setWP(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  checkedMailButton = true;
-  checkedMail = "WP";
-  if (checkedPortButton)
-    setHostPort(checkedMail, protocol);
+    checkedMailButton = true;
+    checkedMail = "WP";
+    if (checkedPortButton)
+        setHostPort(checkedMail, protocol);
 }
 
-void EmailPage::setYahoo(bool) {
+void EmailPage::setYahoo(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  checkedMailButton = true;
-  checkedMail = "Yahoo";
-  if (checkedPortButton)
-    setHostPort(checkedMail, protocol);
+    checkedMailButton = true;
+    checkedMail = "Yahoo";
+    if (checkedPortButton)
+        setHostPort(checkedMail, protocol);
 }
 
-void EmailPage::setHotMail(bool) {
+void EmailPage::setHotMail(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  checkedMailButton = true;
-  checkedMail = "HotMail (stare serwery)";
-  if (checkedPortButton)
-    setHostPort(checkedMail, protocol);
+    checkedMailButton = true;
+    checkedMail = "HotMail (stare serwery)";
+    if (checkedPortButton)
+        setHostPort(checkedMail, protocol);
 }
 
-void EmailPage::setGazeta(bool) {
+void EmailPage::setGazeta(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  checkedMailButton = true;
-  checkedMail = "Gazeta";
-  if (checkedPortButton)
-    setHostPort(checkedMail, protocol);
+    checkedMailButton = true;
+    checkedMail = "Gazeta";
+    if (checkedPortButton)
+        setHostPort(checkedMail, protocol);
 }
 
-void EmailPage::setAol(bool) {
+void EmailPage::setAol(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  checkedMailButton = true;
-  checkedMail = "Aol";
-  if (checkedPortButton)
-    setHostPort(checkedMail, protocol);
+    checkedMailButton = true;
+    checkedMail = "Aol";
+    if (checkedPortButton)
+        setHostPort(checkedMail, protocol);
 }
 
-void EmailPage::setFoxMail(bool) {
+void EmailPage::setFoxMail(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  checkedMailButton = true;
-  checkedMail = "Foxmail / QQMail";
-  if (checkedPortButton)
-    setHostPort(checkedMail, protocol);
+    checkedMailButton = true;
+    checkedMail = "Foxmail / QQMail";
+    if (checkedPortButton)
+        setHostPort(checkedMail, protocol);
 }
 
-void EmailPage::setOutlook(bool) {
+void EmailPage::setOutlook(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
-
-  checkedMailButton = true;
-  checkedMail = "Outlook";
-  if (checkedPortButton)
-    setHostPort(checkedMail, protocol);
+    checkedMailButton = true;
+    checkedMail = "Outlook";
+    if (checkedPortButton)
+        setHostPort(checkedMail, protocol);
 }
 
 // Last page with email form, where some informations are ready in QLineEdits
-ConclusionPage::ConclusionPage(QWidget *parent) : QWizardPage(parent) {
+ConclusionPage::ConclusionPage(QWidget *parent)
+    : QWizardPage(parent)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
+    setTitle(tr("Wprowadzanie danych"));
+    setSubTitle(
+        tr("Wybierz jeden z szablonów do wygenerowania"
+           " treści lub wprowadź własną. Wybierz \"Zakończ\", żeby "
+           "zamknąć okno. Pamiętaj, aby przed zamknięciem wysłać "
+           "wiadomość. Tymczasowo program po wysłaniu wiadomości kończy "
+           "działanie, jednak po wysłaniu wiadomości."));
 
-  setTitle(tr("Wprowadzanie danych"));
-  setSubTitle(tr("Wybierz jeden z szablonów do wygenerowania"
-                 " treści lub wprowadź własną. Wybierz \"Zakończ\", żeby "
-                 "zamknąć okno. Pamiętaj, aby przed zamknięciem wysłać "
-                 "wiadomość. Tymczasowo program po wysłaniu wiadomości kończy "
-                 "działanie, jednak po wysłaniu wiadomości."));
+    emailWindow = new EmailWindow;
+    QVBoxLayout *layout = new QVBoxLayout;
+    layout->addWidget(emailWindow);
+    setLayout(layout);
 
-  emailWindow = new EmailWindow;
-  QVBoxLayout *layout = new QVBoxLayout;
-  layout->addWidget(emailWindow);
-  setLayout(layout);
-
-  connect(emailWindow->getTemplate_1(), SIGNAL(toggled(bool)), this,
-          SLOT(getTemplateOne(bool)));
-  connect(emailWindow->getTemplate_2(), SIGNAL(toggled(bool)), this,
-          SLOT(getTemplateTwo(bool)));
-  connect(emailWindow->getTemplate_3(), SIGNAL(toggled(bool)), this,
-          SLOT(getTemplateThree(bool)));
+    connect(emailWindow->getTemplate_1(), SIGNAL(toggled(bool)), this, SLOT(getTemplateOne(bool)));
+    connect(emailWindow->getTemplate_2(), SIGNAL(toggled(bool)), this, SLOT(getTemplateTwo(bool)));
+    connect(
+        emailWindow->getTemplate_3(), SIGNAL(toggled(bool)), this, SLOT(getTemplateThree(bool)));
 }
 
 // what's going on before last page is shown. Preparing...
-void ConclusionPage::initializePage() {
+void ConclusionPage::initializePage()
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
+    emailWindow->setServerName(field("host").toString());
+    emailWindow->setPortNumber(field("port").toString());
+    emailWindow->setRecipMail(field("emailData").toString());
 
-  emailWindow->setServerName(field("host").toString());
-  emailWindow->setPortNumber(field("port").toString());
-  emailWindow->setRecipMail(field("emailData").toString());
+    QSettings settings("elinux", "user");
+    settings.beginGroup("choosenSeller");
+    emailWindow->setUserName(settings.value("email").toString());
+    settings.endGroup();
 
-  QSettings settings("elinux", "user");
-  settings.beginGroup("choosenSeller");
-  emailWindow->setUserName(settings.value("email").toString());
-  settings.endGroup();
-
-  QString finishText = wizard()->buttonText(QWizard::FinishButton);
-  finishText.remove('&');
+    QString finishText = wizard()->buttonText(QWizard::FinishButton);
+    finishText.remove('&');
 }
 
-void ConclusionPage::getTemplateOne(bool) {
+void ConclusionPage::getTemplateOne(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
+    QDir allFiles;
+    allFiles.setPath(sett().getPdfDir());
+    allFiles.setFilter(QDir::Files);
+    QStringList filters;
+    filters << field("invtypeData").toString() + "*-" + field("symbolData").toString() + ".pdf";
 
-  QDir allFiles;
-  allFiles.setPath(sett().getPdfDir());
-  allFiles.setFilter(QDir::Files);
-  QStringList filters;
-  filters << field("invtypeData").toString() + "*-" +
-                 field("symbolData").toString() + ".pdf";
+    allFiles.setNameFilters(filters);
+    QStringList files = allFiles.entryList();
+    QFile *plik = new QFile(sett().getPdfDir() + "/" + files.at(0));
 
-  allFiles.setNameFilters(filters);
-  QStringList files = allFiles.entryList();
-  QFile *plik = new QFile(sett().getPdfDir() + "/" + files.at(0));
+    QSettings settings("elinux", "user");
 
-  QSettings settings("elinux", "user");
+    settings.beginGroup("choosenSeller");
+    emailWindow->setSubject(
+        "Faktura od " + settings.value("name").toString() + " nr "
+        + field("symbolData").toString());
 
-  settings.beginGroup("choosenSeller");
-  emailWindow->setSubject("Faktura od " + settings.value("name").toString() +
-                          " nr " + field("symbolData").toString());
-
-  emailWindow->setMessage(
+    emailWindow->setMessage(
       "Szanowni Państwo, \n \tFirma " + settings.value("name").toString() +
       " przesyła Państwu dokument w formie elektronicznej: \n" +
       field("invtypeData").toString() + " Nr. " +
@@ -819,33 +897,32 @@ void ConclusionPage::getTemplateOne(bool) {
       "Pozdrawiamy, \n" +
       settings.value("name").toString());
 
-  emailWindow->addNextFile(plik->fileName());
-  emailWindow->addFile(plik->fileName());
+    emailWindow->addNextFile(plik->fileName());
+    emailWindow->addFile(plik->fileName());
 
-  settings.endGroup();
+    settings.endGroup();
 }
 
-void ConclusionPage::getTemplateTwo(bool) {
+void ConclusionPage::getTemplateTwo(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
+    QDir allFiles;
+    allFiles.setPath(sett().getPdfDir());
+    allFiles.setFilter(QDir::Files);
+    QStringList filters;
+    filters << field("invtypeData").toString() + "*-" + field("symbolData").toString() + ".pdf";
 
-  QDir allFiles;
-  allFiles.setPath(sett().getPdfDir());
-  allFiles.setFilter(QDir::Files);
-  QStringList filters;
-  filters << field("invtypeData").toString() + "*-" +
-                 field("symbolData").toString() + ".pdf";
+    allFiles.setNameFilters(filters);
+    QStringList files = allFiles.entryList();
+    QFile *plik = new QFile(sett().getPdfDir() + "/" + files.at(0));
 
-  allFiles.setNameFilters(filters);
-  QStringList files = allFiles.entryList();
-  QFile *plik = new QFile(sett().getPdfDir() + "/" + files.at(0));
+    QSettings settings("elinux", "user");
 
-  QSettings settings("elinux", "user");
+    settings.beginGroup("choosenSeller");
+    emailWindow->setSubject("Przypomnienie o terminie zapłaty");
 
-  settings.beginGroup("choosenSeller");
-  emailWindow->setSubject("Przypomnienie o terminie zapłaty");
-
-  emailWindow->setMessage(
+    emailWindow->setMessage(
       "Szanowni Państwo, \n \tUprzejmie informujemy, iż do dnia dzisiejszego "
       "nie otrzymaliśmy zapłaty należności wynikających z następujących "
       "faktur: \n" +
@@ -862,34 +939,33 @@ void ConclusionPage::getTemplateTwo(bool) {
       "Pozdrawiamy, \n" +
       settings.value("name").toString());
 
-  emailWindow->removeLastFile(plik->fileName());
-  emailWindow->removeFile(plik->fileName());
+    emailWindow->removeLastFile(plik->fileName());
+    emailWindow->removeFile(plik->fileName());
 
-  settings.endGroup();
+    settings.endGroup();
 }
 
-void ConclusionPage::getTemplateThree(bool) {
+void ConclusionPage::getTemplateThree(bool)
+{
+    StrDebug();
 
-  qDebug() << "[" << __FILE__ << ": " << __LINE__ << "] " << __FUNCTION__;
+    QDir allFiles;
+    allFiles.setPath(sett().getPdfDir());
+    allFiles.setFilter(QDir::Files);
+    QStringList filters;
+    filters << field("invtypeData").toString() + "*-" + field("symbolData").toString() + ".pdf";
 
-  QDir allFiles;
-  allFiles.setPath(sett().getPdfDir());
-  allFiles.setFilter(QDir::Files);
-  QStringList filters;
-  filters << field("invtypeData").toString() + "*-" +
-                 field("symbolData").toString() + ".pdf";
+    allFiles.setNameFilters(filters);
+    QStringList files = allFiles.entryList();
+    QFile *plik = new QFile(sett().getPdfDir() + "/" + files.at(0));
 
-  allFiles.setNameFilters(filters);
-  QStringList files = allFiles.entryList();
-  QFile *plik = new QFile(sett().getPdfDir() + "/" + files.at(0));
+    QSettings settings("elinux", "user");
+    ConvertAmount *conv = new ConvertAmount;
 
-  QSettings settings("elinux", "user");
-  ConvertAmount *conv = new ConvertAmount;
+    settings.beginGroup("choosenSeller");
+    emailWindow->setSubject("Ostateczne wezwanie do zapłaty");
 
-  settings.beginGroup("choosenSeller");
-  emailWindow->setSubject("Ostateczne wezwanie do zapłaty");
-
-  emailWindow->setMessage(
+    emailWindow->setMessage(
       "Szanowni Państwo, \n \tNiniejszym wzywamy Państwa do zapłaty w terminie "
       "14 dni od dnia doręczenia wezwania "
       "kwoty " +
@@ -912,8 +988,8 @@ void ConclusionPage::getTemplateThree(bool) {
       "Pozdrawiamy, \n" +
       settings.value("name").toString());
 
-  emailWindow->removeLastFile(plik->fileName());
-  emailWindow->removeFile(plik->fileName());
+    emailWindow->removeLastFile(plik->fileName());
+    emailWindow->removeFile(plik->fileName());
 
-  settings.endGroup();
+    settings.endGroup();
 }

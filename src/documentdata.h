@@ -5,18 +5,15 @@
 #ifndef DOCUMENTDATA_H
 #define DOCUMENTDATA_H
 
-#include <QString>
+#include "fwd.hpp"
 
-// parent class for two inherited classes: InvoiceData and WarehouseData
-class DocumentData {
-
+class DocumentData
+{
 public:
-  virtual QString getCustomer() {
-    return QString();
-  }; // use method for inherited classes, because variable cannot be virtual
+    virtual QString getCustomer() const = 0;
 
 protected:
-private:
+    ~DocumentData() = default;
 };
 
 #endif // DOCUMENTDATA_H

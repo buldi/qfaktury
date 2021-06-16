@@ -6,60 +6,84 @@
 #include <QPainter>
 
 ownCalendarWidget::ownCalendarWidget(QWidget *parent)
-    : QCalendarWidget(parent) {}
-
-ownCalendarWidget::~ownCalendarWidget() {}
-
-void ownCalendarWidget::ourCall(QDate) {
-  // here we set some conditions
-  update();
+    : QCalendarWidget(parent)
+{
 }
 
-QSize ownCalendarWidget::sizeHint() const { return QSize(); }
+ownCalendarWidget::~ownCalendarWidget()
+{
+}
 
-QSize ownCalendarWidget::minimumSizeHint() const { return QSize(); }
+void ownCalendarWidget::ourCall(QDate)
+{
+    // here we set some conditions
+    update();
+}
 
-void ownCalendarWidget::resizeEvent(QResizeEvent *) {}
+QSize ownCalendarWidget::sizeHint() const
+{
+    return QSize();
+}
 
-void ownCalendarWidget::mousePressEvent(QMouseEvent *) {}
+QSize ownCalendarWidget::minimumSizeHint() const
+{
+    return QSize();
+}
 
-void ownCalendarWidget::keyPressEvent(QKeyEvent *) {}
+void ownCalendarWidget::resizeEvent(QResizeEvent *)
+{
+}
 
-bool ownCalendarWidget::eventFilter(QObject *, QEvent *) { return true; }
+void ownCalendarWidget::mousePressEvent(QMouseEvent *)
+{
+}
 
-bool ownCalendarWidget::event(QEvent *) { return true; }
+void ownCalendarWidget::keyPressEvent(QKeyEvent *)
+{
+}
 
-void ownCalendarWidget::paintCell(QPainter *painter, const QRect &rect,
-                                  const QDate &date) const {
+bool ownCalendarWidget::eventFilter(QObject *, QEvent *)
+{
+    return true;
+}
 
-  QDir allFiles;
-  QList<QDate> dateList;
+bool ownCalendarWidget::event(QEvent *)
+{
+    return true;
+}
 
-  allFiles.setPath(QDir::homePath() + "/.local/share/data/elinux/plans");
-  allFiles.setFilter(QDir::Files);
-  QStringList filters;
-  filters << "*.txt";
+void ownCalendarWidget::paintCell(QPainter *painter, const QRect &rect, const QDate &date) const
+{
+    QDir allFiles;
+    QList<QDate> dateList;
 
-  allFiles.setNameFilters(filters);
-  QStringList files = allFiles.entryList();
-  int i, max = files.count();
+    allFiles.setPath(QDir::homePath() + "/.local/share/data/elinux/plans");
+    allFiles.setFilter(QDir::Files);
+    QStringList filters;
+    filters << "*.txt";
 
-  for (i = 0; i < max; ++i) {
+    allFiles.setNameFilters(filters);
+    QStringList files = allFiles.entryList();
+    int i, max = files.count();
 
-    QString dateFound = files.at(i);
-    dateFound = dateFound.remove(".txt");
-    dateList.append(QDate::fromString(dateFound));
-  }
+    for (i = 0; i < max; ++i)
+    {
+        QString dateFound = files.at(i);
+        dateFound = dateFound.remove(".txt");
+        dateList.append(QDate::fromString(dateFound));
+    }
 
-  if (dateList.contains(date)) { // our conditions
-    // When the conditions are matched, passed QDate is drawn as we like.
-    painter->save();
-    painter->drawRoundedRect(rect, 12,
-                             12); // here we draw n ellipse and the day—
-    painter->drawText(rect, Qt::AlignCenter, QString::number(date.day()));
-    painter->restore();
-
-  } else { // if our conditions are not matching, show the default way.
-    QCalendarWidget::paintCell(painter, rect, date);
-  }
+    if (dateList.contains(date))
+    { // our conditions
+        // When the conditions are matched, passed QDate is drawn as we like.
+        painter->save();
+        painter->drawRoundedRect(rect, 12,
+                                 12); // here we draw n ellipse and the day—
+        painter->drawText(rect, Qt::AlignCenter, QString::number(date.day()));
+        painter->restore();
+    }
+    else
+    { // if our conditions are not matching, show the default way.
+        QCalendarWidget::paintCell(painter, rect, date);
+    }
 }

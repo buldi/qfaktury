@@ -35,7 +35,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.*/
 QString Smtp::status = " ";
 
 Smtp::Smtp(const QString &user, const QString &pass, const QString &host,
-           int port, int timeout) {
+           quint16 port, int timeout) {
   socket = new QSslSocket(this);
 
   connect(socket, SIGNAL(readyRead()), this, SLOT(readyRead()));

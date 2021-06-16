@@ -1,105 +1,99 @@
 #include "backup.h"
-#include "ui_backup.h"
 #include "settings.h"
-
-#if QUAZIP_FOUND
-#include "JlCompress.h"
-#include "quazipdir.h"
-#endif
-
-#include <QSettings>
-#include <QDir>
-#include <QMessageBox>
-#include <QFileDialog>
+#include "ui_backup.h"
 
 #include "debug_message.h"
 
-Backup::Backup(QString action, QWidget *parent) :
-    QWidget(parent),
-    ui(new Ui::Backup)
+#if QUAZIP_FOUND
+#include "quazip5/JlCompress.h"
+#include "quazip5/quazipdir.h"
+#endif
+
+#include <QDate>
+#include <QDir>
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QSettings>
+
+#include <QDebug>
+
+Backup::Backup(QString action, QWidget *parent)
+    : QWidget(parent)
+    , ui(new Ui::Backup)
 {
-    StrDebug;
+    StrDebug();
 
     ui->setupUi(this);
 
-    if (QString::compare(action, "create") == 0) {
-
+    if (QString::compare(action, "create") == 0)
+    {
         setWindowTitle("Tworzenie kopii zapasowej");
         putDataToWidgets(getDirectoryPath(), getFilename());
         prepareConnections();
         show();
-
-    } else if (QString::compare(action, "load") == 0) {
-
+    }
+    else if (QString::compare(action, "load") == 0)
+    {
         hide();
         loadBackup();
-
     }
 }
 
-
-Backup::Backup(bool withGui, QWidget *parent) :
-    QWidget(parent),
-    ui(new Ui::Backup)
+Backup::Backup(bool withGui, QWidget *parent)
+    : QWidget(parent)
+    , ui(new Ui::Backup)
 {
-    StrDebug;
+    StrDebug();
 
     ui->setupUi(this);
 
-    if (!withGui) {
-
+    if (!withGui)
+    {
         whenAutoBackup();
-
-    } else {
-
+    }
+    else
+    {
         prepareConnections();
         show();
     }
 }
-
 
 Backup::~Backup()
 {
     delete ui;
 }
 
+void Backup::prepareConnections()
+{
+    StrDebug();
 
-void Backup::prepareConnections() {
-
-    StrDebug;
-
-    connect(ui->browseButton, &QAbstractButton::clicked, this,
-            &Backup::choosePathBackup);
+    connect(ui->browseButton, &QAbstractButton::clicked, this, &Backup::choosePathBackup);
     connect(ui->okButton, &QAbstractButton::clicked, this, &Backup::createBackup);
     connect(ui->cancButton, &QAbstractButton::clicked, this, [=]() { close(); });
-
 }
 
-
-const QString Backup::getBackupPath() const {
-
-    StrDebug;
+const QString Backup::getBackupPath() const
+{
+    StrDebug();
 
     QString backupPath = sett().getWorkingDir();
     QSettings settings("elinux", "qfaktury");
 
     settings.beginGroup("backup_settings");
-    bool ifbackupPathSett = !settings.value("backup_path").toString().isEmpty() &&
-                          !settings.value("backup_path").toString().isNull();
+    bool ifbackupPathSett = !settings.value("backup_path").toString().isEmpty()
+        && !settings.value("backup_path").toString().isNull();
 
     if (ifbackupPathSett)
         backupPath = settings.value("backup_path").toString();
 
-
     settings.endGroup();
 
     return backupPath;
-
 }
 
-const QString Backup::getDirectoryPath() const {
-
-    StrDebug;
+const QString Backup::getDirectoryPath() const
+{
+    StrDebug();
 
     QString dirPath = QString();
     QSettings settings("elinux", "qfaktury");
@@ -111,35 +105,32 @@ const QString Backup::getDirectoryPath() const {
     return dirPath;
 }
 
-
-const QString Backup::getFilename() const {
-
-    StrDebug;
+const QString Backup::getFilename() const
+{
+    StrDebug();
 
     QString checkSlashPath = getDirectoryPath();
 
     if (!checkSlashPath.endsWith('/'))
-      checkSlashPath += '/';
+        checkSlashPath += '/';
 
-    QStringRef fileName(&checkSlashPath, checkSlashPath.lastIndexOf('/') + 1,
-                        checkSlashPath.lastIndexOf('.') - 1);
+    QStringRef fileName(
+        &checkSlashPath, checkSlashPath.lastIndexOf('/') + 1, checkSlashPath.lastIndexOf('.') - 1);
 
     return fileName.toString();
 }
 
-
-void Backup::putDataToWidgets(const QString dirPath, const QString filename) {
-
-    StrDebug;
+void Backup::putDataToWidgets(const QString dirPath, const QString filename)
+{
+    StrDebug();
 
     ui->directoryLineEdit->setText(dirPath);
     ui->fileLineEdit->setText(filename);
 }
 
-
-void Backup::whenAutoBackup() {
-
-    StrDebug;
+void Backup::whenAutoBackup()
+{
+    StrDebug();
 
     QSettings settings("elinux", "qfaktury");
 
@@ -150,241 +141,249 @@ void Backup::whenAutoBackup() {
 
     QChar periodTimeSymb = settings.value("backup_interval").toString().back();
 
-    if (!settings.value("lastBackupDate").toString().isEmpty() &&
-        !settings.value("lastBackupDate").toString().isEmpty()) {
-      if (periodTimeSymb == 'D' && (settings.value("lastBackupDate").toInt() <
-                                    QDate::currentDate().dayOfYear() - timeInt))
-        createBackupWithoutGui();
-      else if (periodTimeSymb == 'W' &&
-               (settings.value("lastBackupDate").toInt() <
-                QDate::currentDate().dayOfYear() - (timeInt * 7)))
-        createBackupWithoutGui();
-      else if (periodTimeSymb == 'M' &&
-               settings.value("lastBackupDate").toInt() <
-                   (QDate::currentDate().dayOfYear() - (timeInt * 31)))
-        createBackupWithoutGui();
-      else
-        createBackupWithoutGui(); // It's sure that will be in minutes or hours
-                                  // then from QTimer connection
-    } else {
-      createBackupWithoutGui(); // just create backup. Needed if user starts
-                                // qfaktury first time after newly added features
+    if (!settings.value("lastBackupDate").toString().isEmpty()
+        && !settings.value("lastBackupDate").toString().isEmpty())
+    {
+        if (periodTimeSymb == 'D'
+            && (settings.value("lastBackupDate").toInt()
+                < QDate::currentDate().dayOfYear() - timeInt))
+            createBackupWithoutGui();
+        else if (
+            periodTimeSymb == 'W'
+            && (settings.value("lastBackupDate").toInt()
+                < QDate::currentDate().dayOfYear() - (timeInt * 7)))
+            createBackupWithoutGui();
+        else if (
+            periodTimeSymb == 'M'
+            && settings.value("lastBackupDate").toInt()
+                < (QDate::currentDate().dayOfYear() - (timeInt * 31)))
+            createBackupWithoutGui();
+        else
+            createBackupWithoutGui(); // It's sure that will be in minutes or hours
+                                      // then from QTimer connection
+    }
+    else
+    {
+        createBackupWithoutGui(); // just create backup. Needed if user starts
+                                  // qfaktury first time after newly added features
     }
 
     settings.setValue("lastBackupDate", QDate::currentDate().dayOfYear());
     settings.endGroup();
 }
 
-
-void Backup::createBackupWithoutGui() {
-
+void Backup::createBackupWithoutGui()
+{
 #if QUAZIP_FOUND
 
-    StrDebug;
+    StrDebug();
 
-    QString checkPath = (getBackupPath().endsWith('/'))
-                            ? getBackupPath()
-                            : getBackupPath() + "/";
+    QString checkPath = (getBackupPath().endsWith('/')) ? getBackupPath() : getBackupPath() + "/";
 
     bool completed =
-        (JlCompress::compressDir(checkPath + QString("backup.zip"),
-                                 sett().getWorkingDir(), true, QDir::AllDirs) &&
-         JlCompress::compressFiles(checkPath + QString("backup-configs.zip"),
-                                   (QStringList()
-                                    << sett().fileName()
-                                    << sett().fileName().left(
-                                           sett().fileName().lastIndexOf("/")) +
-                                           "/user.conf")));
-
-
+        (JlCompress::compressDir(
+             checkPath + QString("backup.zip"), sett().getWorkingDir(), true, QDir::AllDirs)
+         && JlCompress::compressFiles(
+             checkPath + QString("backup-configs.zip"),
+             (QStringList() << sett().fileName()
+                            << sett().fileName().left(sett().fileName().lastIndexOf("/"))
+                  + "/user.conf")));
 
     QSettings settings("elinux", "qfaktury");
 
     settings.beginGroup("backup_settings");
     qDebug() << "Saved backup path is: " << settings.value("backup_path").toString();
-    if (settings.value("backup_every_time").toBool()) {
-      if (completed) {
-
-
-        qDebug() << "Created archive with interval in " + checkPath +
-                          "backup.zip and " + checkPath + "backup-configs.zip";
-        checkPath.chop(1);
-        QMessageBox::information(
-            this, trUtf8("Tworzenie kopii zapasowej"),
-            "Stworzenie kopii zapasowej zakończyło się sukcesem! Zostało stworzone w ścieżce: \"" + checkPath + "\"");
-
-      } else {
-
-          qDebug() << "Archive had not been created with interval in " + checkPath +
-                          "backup.zip and " + checkPath + "backup-configs.zip";
-        checkPath.chop(1);
-        QMessageBox::warning(
-            this, "Tworzenie kopii zapasowej",
-            "Stworzenie kopii zapasowej zakończyło "
-            "się niepowodzeniem. Sprawdź, czy masz uprawnienia "
-            "do odczytu i zapisu w wybranym folderze. Upewnij się także, "
-            "że ścieżka: \"" +
-                checkPath + "\" istnieje.");
-      }
-    } else {
-
-      if (completed)
-        qDebug() << "Created archive with interval in " + checkPath +
-                        "backup.zip and " + checkPath + "backup-configs.zip";
-      else
-        qDebug() << "Archive had not been created with interval in " + checkPath +
-                        "backup.zip and " + checkPath + "backup-configs.zip";
+    if (settings.value("backup_every_time").toBool())
+    {
+        if (completed)
+        {
+            qDebug() << "Created archive with interval in " + checkPath + "backup.zip and "
+                    + checkPath + "backup-configs.zip";
+            checkPath.chop(1);
+            QMessageBox::information(
+                this,
+                trUtf8("Tworzenie kopii zapasowej"),
+                "Stworzenie kopii zapasowej zakończyło się sukcesem! Zostało stworzone w ścieżce: "
+                "\"" + checkPath
+                    + "\"");
+        }
+        else
+        {
+            qDebug() << "Archive had not been created with interval in " + checkPath
+                    + "backup.zip and " + checkPath + "backup-configs.zip";
+            checkPath.chop(1);
+            QMessageBox::warning(
+                this,
+                "Tworzenie kopii zapasowej",
+                "Stworzenie kopii zapasowej zakończyło "
+                "się niepowodzeniem. Sprawdź, czy masz uprawnienia "
+                "do odczytu i zapisu w wybranym folderze. Upewnij się także, "
+                "że ścieżka: \""
+                    + checkPath + "\" istnieje.");
+        }
+    }
+    else
+    {
+        if (completed)
+            qDebug() << "Created archive with interval in " + checkPath + "backup.zip and "
+                    + checkPath + "backup-configs.zip";
+        else
+            qDebug() << "Archive had not been created with interval in " + checkPath
+                    + "backup.zip and " + checkPath + "backup-configs.zip";
     }
 
     settings.endGroup();
 
 #endif
-
 }
 
+void Backup::choosePathBackup()
+{
+    StrDebug();
 
-void Backup::choosePathBackup() {
+    QString directory = QDir::toNativeSeparators(
+        QFileDialog::getExistingDirectory(this, tr("Find Files"), sett().getWorkingDir()));
 
-  StrDebug;
-
-  QString directory =
-      QDir::toNativeSeparators(QFileDialog::getExistingDirectory(
-          this, tr("Find Files"), sett().getWorkingDir()));
-
-  if (!directory.isEmpty()) {
-    ui->directoryLineEdit->setText(directory);
-  }
-
+    if (!directory.isEmpty())
+    {
+        ui->directoryLineEdit->setText(directory);
+    }
 }
 
-
-void Backup::createBackup() {
-
+void Backup::createBackup()
+{
 #if QUAZIP_FOUND
 
-  StrDebug;
+    StrDebug();
 
-  QStringList listConf = QStringList()
-                         << sett().fileName()
-                         << sett().fileName().left(
-                                sett().fileName().lastIndexOf("/")) +
-                                "/user.conf";
+    QStringList listConf = QStringList()
+        << sett().fileName()
+        << sett().fileName().left(sett().fileName().lastIndexOf("/")) + "/user.conf";
 
-  if (ui->fileLineEdit->text().isEmpty() || ui->directoryLineEdit->text().isEmpty()) {
-
-    QMessageBox::warning(this, trUtf8("Brakująca ścieżka"),
-                         trUtf8("Nazwa dla archiwum oraz ścieżka dla "
-                                "tworzonego archiwum nie może być pominięta"));
-
-  } else {
-
-    if (JlCompress::compressDir(ui->directoryLineEdit->text() + QString("/") +
-                                    ui->fileLineEdit->text() + QString(".zip"),
-                                sett().getWorkingDir(), true, QDir::AllDirs) &&
-        JlCompress::compressFiles(ui->directoryLineEdit->text() + QString("/") +
-                                      ui->fileLineEdit->text() +
-                                      QString("-configs.zip"),
-                                  listConf)) {
-      qDebug() << "Created archive";
-      QMessageBox::information(
-          this, trUtf8("Tworzenie kopii zapasowej"),
-          trUtf8("Stworzenie kopii zapasowej zakończyło się sukcesem!"));
-
-    } else {
-
-      qDebug() << "Archive had not been created";
-      QMessageBox::warning(
-          this, trUtf8("Tworzenie kopii zapasowej"),
-          trUtf8("Stworzenie kopii zapasowej zakończyło "
-                 "się niepowodzeniem. Sprawdź, czy masz uprawnienia "
-                 "do odczytu i zapisu w wybranym folderze."));
+    if (ui->fileLineEdit->text().isEmpty() || ui->directoryLineEdit->text().isEmpty())
+    {
+        QMessageBox::warning(
+            this,
+            trUtf8("Brakująca ścieżka"),
+            trUtf8("Nazwa dla archiwum oraz ścieżka dla "
+                   "tworzonego archiwum nie może być pominięta"));
     }
+    else
+    {
+        if (JlCompress::compressDir(
+                ui->directoryLineEdit->text() + QString("/") + ui->fileLineEdit->text()
+                    + QString(".zip"),
+                sett().getWorkingDir(),
+                true,
+                QDir::AllDirs)
+            && JlCompress::compressFiles(
+                ui->directoryLineEdit->text() + QString("/") + ui->fileLineEdit->text()
+                    + QString("-configs.zip"),
+                listConf))
+        {
+            qDebug() << "Created archive";
+            QMessageBox::information(
+                this,
+                trUtf8("Tworzenie kopii zapasowej"),
+                trUtf8("Stworzenie kopii zapasowej zakończyło się sukcesem!"));
+        }
+        else
+        {
+            qDebug() << "Archive had not been created";
+            QMessageBox::warning(
+                this,
+                trUtf8("Tworzenie kopii zapasowej"),
+                trUtf8("Stworzenie kopii zapasowej zakończyło "
+                       "się niepowodzeniem. Sprawdź, czy masz uprawnienia "
+                       "do odczytu i zapisu w wybranym folderze."));
+        }
 
-    qDebug() << ui->directoryLineEdit->text() + QString("/") +
-                    ui->fileLineEdit->text() + QString(".zip");
-
-  }
+        qDebug() << ui->directoryLineEdit->text() + QString("/") + ui->fileLineEdit->text()
+                + QString(".zip");
+    }
 #endif
 }
 
-
-void Backup::loadBackup() {
-
+void Backup::loadBackup()
+{
 #if QUAZIP_FOUND
 
-  StrDebug;
+    StrDebug();
 
-  QMessageBox msgBox;
-  msgBox.setText(
-      trUtf8("Wczytywanie kopii zapasowej nadpisze obecny stan. Wpierw musisz "
-             "wybrać katalog, następnie pojawi się okno z jego zawartością."));
-  msgBox.setInformativeText(trUtf8("Chcesz kontynuować?"));
-  msgBox.setIcon(QMessageBox::Information);
-  msgBox.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
-  msgBox.setDefaultButton(QMessageBox::Ok);
-  int ret = msgBox.exec();
+    QMessageBox msgBox;
+    msgBox.setText(
+        trUtf8("Wczytywanie kopii zapasowej nadpisze obecny stan. Wpierw musisz "
+               "wybrać katalog, następnie pojawi się okno z jego zawartością."));
+    msgBox.setInformativeText(trUtf8("Chcesz kontynuować?"));
+    msgBox.setIcon(QMessageBox::Information);
+    msgBox.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
+    msgBox.setDefaultButton(QMessageBox::Ok);
+    int ret = msgBox.exec();
 
-  switch (ret) {
-  case QMessageBox::Ok:
+    switch (ret)
+    {
+    case QMessageBox::Ok:
 
-      QString fileName = QFileDialog::getOpenFileName(
-        this, trUtf8("Wybierz kopię zapasową"),
-        QFileDialog::getExistingDirectory(this, trUtf8("Znajdź"),
-                                          QDir::currentPath()),
-        trUtf8("pliki archiwalne (*.zip)"));
+        QString fileName = QFileDialog::getOpenFileName(
+            this,
+            trUtf8("Wybierz kopię zapasową"),
+            QFileDialog::getExistingDirectory(this, trUtf8("Znajdź"), QDir::currentPath()),
+            trUtf8("pliki archiwalne (*.zip)"));
 
-    if (fileName.endsWith("-configs.zip")) {
+        if (fileName.endsWith("-configs.zip"))
+        {
+            qDebug() << "Chosen Backup file ended with -configs.zip";
 
-        qDebug() << "Chosen Backup file ended with -configs.zip";
+            QStringList configsList = QStringList() << "qfaktury.conf"
+                                                    << "user.conf";
 
-      QStringList configsList = QStringList() << "qfaktury.conf"
-                                              << "user.conf";
+            QStringList confList = JlCompress::extractFiles(
+                fileName, configsList, sett().fileName().left(sett().fileName().lastIndexOf("/")));
 
-      QStringList confList = JlCompress::extractFiles(
-          fileName, configsList,
-          sett().fileName().left(sett().fileName().lastIndexOf("/")));
+            if (confList.count() > 0)
 
-      if (confList.count() > 0)
+                QMessageBox::information(
+                    this,
+                    trUtf8("Kopia zapasowa plików konfiguracyjnych"),
+                    trUtf8("Wczytywanie kopii zapasowej zakończyło się sukcesem!"));
+            else
 
-          QMessageBox::information(
-            this, trUtf8("Kopia zapasowa plików konfiguracyjnych"),
-            trUtf8("Wczytywanie kopii zapasowej zakończyło się sukcesem!"));
-      else
+                QMessageBox::warning(
+                    this,
+                    trUtf8("Kopia zapasowa plików konfiguracyjnych"),
+                    trUtf8("W archiwum brakuje plików konfiguracyjnych dla QFaktury. "
+                           "Jesteś pewien, że wybrałeś plik z przyrostkiem "
+                           "\"-configs.zip ?\""));
+        }
+        else
+        {
+            qDebug() << "Chosen backup file not ended with -configs.zip";
 
-          QMessageBox::warning(
-            this, trUtf8("Kopia zapasowa plików konfiguracyjnych"),
-            trUtf8("W archiwum brakuje plików konfiguracyjnych dla QFaktury. "
-                   "Jesteś pewien, że wybrałeś plik z przyrostkiem "
-                   "\"-configs.zip ?\""));
+            QStringList listEl = JlCompress::extractDir(fileName, sett().getWorkingDir());
 
-    } else {
+            qDebug() << "List of files in backup file: " << listEl;
 
-        qDebug() << "Chosen backup file not ended with -configs.zip";
+            if (listEl.contains(sett().getWorkingDir() + "/customers.xml")
+                && listEl.contains(sett().getWorkingDir() + "/products.xml"))
+            {
+                QMessageBox::information(
+                    this,
+                    trUtf8("Kopia zapasowa głównego katalogu"),
+                    trUtf8("Wczytywanie kopii zapasowej zakończyło się sukcesem!"));
+            }
+            else
+            {
+                QMessageBox::information(
+                    this,
+                    trUtf8("Kopia zapasowa głównego katalogu"),
+                    trUtf8("Wczytywanie kopii zapasowej zakończyło się niepowodzeniem! "
+                           "Kopia zapasowa powinna zawierać co najmniej listę "
+                           "produktów i kontrahentów."));
+            }
+        }
 
-      QStringList listEl =
-          JlCompress::extractDir(fileName, sett().getWorkingDir());
-
-      qDebug() << "List of files in backup file: " << listEl;
-
-      if (listEl.contains(sett().getWorkingDir() + "/customers.xml") && listEl.contains(sett().getWorkingDir() + "/products.xml")) {
-
-          QMessageBox::information(
-            this, trUtf8("Kopia zapasowa głównego katalogu"),
-            trUtf8("Wczytywanie kopii zapasowej zakończyło się sukcesem!"));
-
-      } else {
-
-          QMessageBox::information(
-            this, trUtf8("Kopia zapasowa głównego katalogu"),
-            trUtf8("Wczytywanie kopii zapasowej zakończyło się niepowodzeniem! "
-                   "Kopia zapasowa powinna zawierać co najmniej listę "
-                   "produktów i kontrahentów."));
-      }
+        break;
     }
 
-    break;
-  }
-
 #endif
-
 }

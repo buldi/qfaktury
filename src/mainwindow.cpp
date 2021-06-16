@@ -1,21 +1,7 @@
-﻿#include <QDateEdit>
-#include <QDesktopServices>
-#include <QDesktopWidget>
-#include <QFileDialog>
-#include <QInputDialog>
-#include <QKeyEvent>
-#include <QPdfWriter>
-#include <QPointer>
-#include <QPrintPreviewDialog>
-#include <QPrinter>
-#include <QProcess>
-#include <QTimer>
-
-#include <memory>
-
-#include "backup.h"
+﻿#include "backup.h"
 #include "bill.h"
 #include "buyers.h"
+#include "config.h"
 #include "const.h"
 #include "correctgross.h"
 #include "csvexport.h"
@@ -35,14 +21,34 @@
 #include "send.h"
 #include "setting.h"
 #include "user.h"
+#include "warehousedata.h"
 #include "xmldatalayer.h"
 
 #include "debug_message.h"
 
 #if QUAZIP_FOUND
-#include "JlCompress.h"
-#include "quazipdir.h"
+#include "quazip5/JlCompress.h"
+#include "quazip5/quazipdir.h"
 #endif
+
+#include <QDateEdit>
+#include <QDesktopServices>
+#include <QDesktopWidget>
+#include <QFileDialog>
+#include <QInputDialog>
+#include <QKeyEvent>
+#include <QMessageBox>
+#include <QPdfWriter>
+#include <QPointer>
+#include <QPrintPreviewDialog>
+#include <QPrinter>
+#include <QProcess>
+#include <QTextStream>
+#include <QTimer>
+
+#include <QDebug>
+
+#include <memory>
 
 MainWindow *MainWindow::m_instance = nullptr;
 bool MainWindow::shouldHidden = false;
@@ -54,7 +60,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
-    StrDebug;
+    StrDebug();
 
     ui->setupUi(this);
     m_instance = this;
@@ -63,7 +69,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow *MainWindow::instance()
 {
-    StrDebug;
+    StrDebug();
 
     return m_instance;
 }
@@ -73,11 +79,12 @@ MainWindow *MainWindow::instance()
 
 MainWindow::~MainWindow()
 {
-    StrDebug;
+    StrDebug();
 
     saveAllSett();
 
-    if (nullptr != backupTimerOften) {
+    if (nullptr != backupTimerOften)
+    {
         backupTimerOften = nullptr;
     }
 
@@ -100,10 +107,11 @@ MainWindow::~MainWindow()
 
 void MainWindow::init()
 {
-    StrDebug;
+    StrDebug();
 
     // first run
-    if (firstRun()) {
+    if (firstRun())
+    {
         // towary/uslugi - wymiary
         ui->tableT->setColumnWidth(0, 50);
         ui->tableT->setColumnWidth(1, 140);
@@ -118,34 +126,37 @@ void MainWindow::init()
 
         saveAllSettAsDefault();
 
-        QMessageBox::information(this,
-                                 "QFaktury",
-                                 trUtf8(
-                                     "Program zawiera konwersję walut w oknie edycji faktury lub "
-                                     "podczas jej tworzenia. By jej używać, powinieneś mieć dostęp "
-                                     "do internetu oraz poprawnie ustawiony czas systemowy."));
-        QMessageBox::information(this,
-                                 "QFaktury",
-                                 trUtf8(
-                                     "W przypadku zmiany lokalizacji systemu, sposób formatowania "
-                                     "liczb może się zmienić. Efekt ten może być widoczny po "
-                                     "restarcie programu."));
+        QMessageBox::information(
+            this,
+            "QFaktury",
+            trUtf8("Program zawiera konwersję walut w oknie edycji faktury lub "
+                   "podczas jej tworzenia. By jej używać, powinieneś mieć dostęp "
+                   "do internetu oraz poprawnie ustawiony czas systemowy."));
+        QMessageBox::information(
+            this,
+            "QFaktury",
+            trUtf8("W przypadku zmiany lokalizacji systemu, sposób formatowania "
+                   "liczb może się zmienić. Efekt ten może być widoczny po "
+                   "restarcie programu."));
 
-        if (QMessageBox::information(this,
-                                     "QFaktury",
-                                     trUtf8("Czy chcesz skonfigurować firmę? Opcja ta "
-                                            "przy starcie programu będzie widoczna "
-                                            "tylko przy pierwszym uruchomieniu."),
-                                     trUtf8("Tak"),
-                                     trUtf8("Nie"),
-                                     nullptr,
-                                     0,
-                                     1)
-            == 0) {
+        if (QMessageBox::information(
+                this,
+                "QFaktury",
+                trUtf8("Czy chcesz skonfigurować firmę? Opcja ta "
+                       "przy starcie programu będzie widoczna "
+                       "tylko przy pierwszym uruchomieniu."),
+                trUtf8("Tak"),
+                trUtf8("Nie"),
+                nullptr,
+                0,
+                1)
+            == 0)
+        {
             userDataClick();
         }
-
-    } else {
+    }
+    else
+    {
         ui->filtrStart->setDisplayFormat(sett().getDateFormat());
         ui->filtrStart->setDate(sett().getValueAsDate("filtrStart"));
         ui->filtrEnd->setDisplayFormat(sett().getDateFormat());
@@ -162,22 +173,25 @@ void MainWindow::init()
     if (!ifEmergTemplateExists())
         createEmergTemplate();
 
-    if (ui->tableH->rowCount() != 0) {
+    if (ui->tableH->rowCount() != 0)
+    {
         ui->invoiceEdAction->setEnabled(true);
         ui->invoiceDelAction->setEnabled(true);
 
-        //if (ui->tableK->rowCount() != 0)
+        // if (ui->tableK->rowCount() != 0)
         // ui->sendEmailAction->setEnabled(true);
-        //else
+        // else
         //  ui->sendEmailAction->setDisabled(true);
-
-    } else {
+    }
+    else
+    {
         ui->invoiceEdAction->setDisabled(true);
         ui->invoiceDelAction->setDisabled(true);
-        //ui->sendEmailAction->setDisabled(true);
+        // ui->sendEmailAction->setDisabled(true);
     }
 
-    if (ui->tableK->rowCount() != 0) {
+    if (ui->tableK->rowCount() != 0)
+    {
         ui->editBuyersAction->setEnabled(true);
         ui->delBuyersAction->setEnabled(true);
         ui->actionPrintBuyer->setEnabled(true);
@@ -187,19 +201,22 @@ void MainWindow::init()
         // } else {
         //   ui->sendEmailAction->setDisabled(true);
         //}
-
-    } else {
+    }
+    else
+    {
         ui->editBuyersAction->setDisabled(true);
         ui->delBuyersAction->setDisabled(true);
         ui->actionPrintBuyer->setDisabled(true);
         // ui->sendEmailAction->setDisabled(true);
     }
 
-    if (ui->tableT->rowCount() != 0) {
+    if (ui->tableT->rowCount() != 0)
+    {
         ui->editGoodsAction->setEnabled(true);
         ui->delGoodsAction->setEnabled(true);
-
-    } else {
+    }
+    else
+    {
         ui->editGoodsAction->setDisabled(true);
         ui->delGoodsAction->setDisabled(true);
     }
@@ -257,7 +274,8 @@ void MainWindow::init()
     calendar = new ownCalendarWidget;
     ui->calendarLayout->addWidget(calendar);
 
-    if (!QUAZIP_FOUND) {
+    if (!QUAZIP_FOUND)
+    {
         ui->actionCreateBackup->deleteLater();
         ui->actionLoadBackup->deleteLater();
     }
@@ -291,11 +309,19 @@ void MainWindow::init()
     connect(ui->delGoodsAction, SIGNAL(triggered()), this, SLOT(goodsDel()));
     connect(ui->findInvoiceAction, SIGNAL(triggered()), this, SLOT(findInvoicePdf()));
     connect(ui->findJPKAction, SIGNAL(triggered()), this, SLOT(openJPKDirectory()));
-    connect(ui->filtrEnd,SIGNAL(dateChanged(const QDate &)), this, SLOT(checkDateRange(const QDate &)));
-    connect(ui->warehouseToDate, SIGNAL(dateChanged(const QDate &)), this, SLOT(checkDateRange(const QDate &)));
+    connect(
+        ui->filtrEnd,
+        SIGNAL(dateChanged(const QDate &)),
+        this,
+        SLOT(checkDateRange(const QDate &)));
+    connect(
+        ui->warehouseToDate,
+        SIGNAL(dateChanged(const QDate &)),
+        this,
+        SLOT(checkDateRange(const QDate &)));
 
     /** Slot used to display aboutQt informations.
-   */
+     */
 
     connect(ui->action_Qt, &QAction::triggered, [this]() {
         QMessageBox::aboutQt(this, sett().getVersion(qAppName()));
@@ -305,7 +331,7 @@ void MainWindow::init()
     connect(ui->fileSettingsAction, SIGNAL(triggered()), this, SLOT(settClick()));
 
     /** Slot help
-   */
+     */
 
     connect(ui->helpAction, &QAction::triggered, []() {
         QDesktopServices::openUrl(QUrl("https://github.com/juliagoda/qfaktury"));
@@ -322,43 +348,39 @@ void MainWindow::init()
     connect(ui->hideOrganizer, SIGNAL(clicked(bool)), this, SLOT(openHideOrganizer()));
     connect(calendar, SIGNAL(activated(const QDate &)), this, SLOT(noteDownTask(const QDate &)));
     connect(ui->tableH, SIGNAL(cellDoubleClicked(int, int)), this, SLOT(editFHist()));
-    connect(ui->tableH,
-            SIGNAL(customContextMenuRequested(QPoint)),
-            this,
-            SLOT(showTableMenuH(QPoint)));
+    connect(
+        ui->tableH, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(showTableMenuH(QPoint)));
     connect(ui->tableK, SIGNAL(cellDoubleClicked(int, int)), this, SLOT(buyerEd()));
-    connect(ui->tableK,
-            SIGNAL(customContextMenuRequested(QPoint)),
-            this,
-            SLOT(showTableMenuK(QPoint)));
-    connect(ui->tableM,
-            SIGNAL(customContextMenuRequested(QPoint)),
-            this,
-            SLOT(showTableMenuM(QPoint)));
+    connect(
+        ui->tableK, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(showTableMenuK(QPoint)));
+    connect(
+        ui->tableM, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(showTableMenuM(QPoint)));
     connect(ui->tableM, SIGNAL(cellDoubleClicked(int, int)), this, SLOT(warehouseEdit()));
     connect(ui->tableT, SIGNAL(cellDoubleClicked(int, int)), this, SLOT(goodsEdit()));
-    connect(ui->tableT,
-            SIGNAL(customContextMenuRequested(QPoint)),
-            this,
-            SLOT(showTableMenuT(QPoint)));
+    connect(
+        ui->tableT, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(showTableMenuT(QPoint)));
     connect(ui->sendEmailAction, SIGNAL(triggered()), this, SLOT(sendEmailToBuyer()));
 
-    connect(ui->tableH,
-            SIGNAL(itemClicked(QTableWidgetItem *)),
-            this,
-            SLOT(mainUpdateStatus(QTableWidgetItem *)));
-    connect(ui->tableK,
-            SIGNAL(itemClicked(QTableWidgetItem *)),
-            this,
-            SLOT(mainUpdateStatus(QTableWidgetItem *)));
-    connect(ui->tableT,
-            SIGNAL(itemClicked(QTableWidgetItem *)),
-            this,
-            SLOT(mainUpdateStatus(QTableWidgetItem *)));
-    connect(ui->tableM,
-            SIGNAL(itemClicked(QTableWidgetItem *)),
-            this,
-            SLOT(mainUpdateStatus(QTableWidgetItem *)));
+    connect(
+        ui->tableH,
+        SIGNAL(itemClicked(QTableWidgetItem *)),
+        this,
+        SLOT(mainUpdateStatus(QTableWidgetItem *)));
+    connect(
+        ui->tableK,
+        SIGNAL(itemClicked(QTableWidgetItem *)),
+        this,
+        SLOT(mainUpdateStatus(QTableWidgetItem *)));
+    connect(
+        ui->tableT,
+        SIGNAL(itemClicked(QTableWidgetItem *)),
+        this,
+        SLOT(mainUpdateStatus(QTableWidgetItem *)));
+    connect(
+        ui->tableM,
+        SIGNAL(itemClicked(QTableWidgetItem *)),
+        this,
+        SLOT(mainUpdateStatus(QTableWidgetItem *)));
     connect(ui->tableK, SIGNAL(cellClicked(int, int)), this, SLOT(openWebTableK(int, int)));
 
     readBuyer();
@@ -367,10 +389,12 @@ void MainWindow::init()
     readGoods();
     categorizeYears();
 
-    if (!ifpdfDirExists()) {
+    if (!ifpdfDirExists())
+    {
         createPdfDir();
-
-    } else {
+    }
+    else
+    {
         QDir _dir(sett().getPdfDir());
         _dir.setFilter(QDir::Files);
         QStringList filters;
@@ -390,24 +414,29 @@ void MainWindow::checkIntervalsForBackup()
     QSettings settings("elinux", "qfaktury");
 
     settings.beginGroup("backup_settings");
-    if (settings.value("regular_backup").toBool()) {
+    if (settings.value("regular_backup").toBool())
+    {
         if (!settings.value("backup_interval").toString().isEmpty()
-            && !settings.value("backup_interval").toString().isNull()) {
+            && !settings.value("backup_interval").toString().isNull())
+        {
             backupTimerOften = new QTimer(this);
             QString num = settings.value("backup_interval").toString();
             num.chop(1);
 
-            if (settings.value("backup_interval").toString().back() == 'h') {
-                backupTimerOften->setInterval(num.toInt() * 60 * 60
-                                              * 1000); // checks regularly after chosen hours
+            if (settings.value("backup_interval").toString().back() == 'h')
+            {
+                backupTimerOften->setInterval(
+                    num.toInt() * 60 * 60 * 1000); // checks regularly after chosen hours
                 backupTimerOften->setSingleShot(false);
-
-            } else if (settings.value("backup_interval").toString().back() == 'm') {
-                backupTimerOften->setInterval(num.toInt() * 60
-                                              * 1000); // checks regularly after chosen minutes
+            }
+            else if (settings.value("backup_interval").toString().back() == 'm')
+            {
+                backupTimerOften->setInterval(
+                    num.toInt() * 60 * 1000); // checks regularly after chosen minutes
                 backupTimerOften->setSingleShot(false);
-
-            } else {
+            }
+            else
+            {
                 backupTimerOften->setInterval(
                     60000); // checks once after 1 minute for days, weeks or months
                 backupTimerOften->setSingleShot(true);
@@ -423,20 +452,23 @@ void MainWindow::checkIntervalsForBackup()
 
 bool MainWindow::ifpdfDirExists()
 {
-    StrDebug;
+    StrDebug();
 
     QDir mainPath(sett().getPdfDir());
 
-    if (!mainPath.exists()) {
+    if (!mainPath.exists())
+    {
         return false;
-    } else {
+    }
+    else
+    {
         return true;
     }
 }
 
 void MainWindow::createPdfDir()
 {
-    StrDebug;
+    StrDebug();
 
     QDir mainPath;
     mainPath.mkpath(sett().getPdfDir());
@@ -445,16 +477,18 @@ void MainWindow::createPdfDir()
 
 void MainWindow::generatePdfFromList()
 {
-    StrDebug;
+    StrDebug();
 
     shouldHidden = true;
 
-    for (int i = 0; i < ui->tableH->rowCount(); i++) {
+    for (int i = 0; i < ui->tableH->rowCount(); i++)
+    {
         ui->tableH->setCurrentCell(i, 0);
         editFHist();
     }
 
-    for (int i = 0; i < ui->tableM->rowCount(); i++) {
+    for (int i = 0; i < ui->tableM->rowCount(); i++)
+    {
         ui->tableM->setCurrentCell(i, 0);
         warehouseEdit();
     }
@@ -464,7 +498,7 @@ void MainWindow::generatePdfFromList()
 
 bool MainWindow::ifEmergTemplateExists()
 {
-    StrDebug;
+    StrDebug();
 
     QFileInfo fileInfo(sett().getEmergTemplate());
 
@@ -476,17 +510,19 @@ bool MainWindow::ifEmergTemplateExists()
 
 void MainWindow::createEmergTemplate()
 {
-    StrDebug;
+    StrDebug();
 
     QDir mainPath(QDir::homePath() + "/.local/share/data/elinux/template");
 
-    if (!mainPath.exists()) {
+    if (!mainPath.exists())
+    {
         mainPath.mkpath(QDir::homePath() + "/.local/share/data/elinux/template");
     }
 
     QFile file(sett().getEmergTemplate());
 
-    if (file.open(QIODevice::WriteOnly)) {
+    if (file.open(QIODevice::WriteOnly))
+    {
         QTextStream stream(&file);
 
         QStringList::const_iterator constIterator;
@@ -505,7 +541,7 @@ void MainWindow::createEmergTemplate()
 
 bool MainWindow::firstRun()
 {
-    StrDebug;
+    StrDebug();
 
     bool ok = sett().value("firstrun", true).toBool();
 
@@ -527,27 +563,29 @@ bool MainWindow::firstRun()
 
 void MainWindow::categorizeYears()
 {
-    StrDebug;
+    StrDebug();
 
-    if (dl->ifThereOldDocuments(sett().getInoiveDocName(),
-                                sett().getInvoicesDir(),
-                                QStringList("h*.xml"
-                                            "k*.xml")))
+    if (dl->ifThereOldDocuments(
+            sett().getInoiveDocName(),
+            sett().getInvoicesDir(),
+            QStringList("h*.xml"
+                        "k*.xml")))
         dl->separateOldDocuments(sett().getInvoicesDir());
 
-    if (dl->ifThereOldDocuments(sett().getWarehouseDocName(),
-                                sett().getWarehouseFullDir(),
-                                QStringList("m*.xml")))
+    if (dl->ifThereOldDocuments(
+            sett().getWarehouseDocName(), sett().getWarehouseFullDir(), QStringList("m*.xml")))
         dl->separateOldDocuments(sett().getWarehouseFullDir());
 }
 
 void MainWindow::openWebTableK(int row, int column)
 {
-    StrDebug;
+    StrDebug();
 
-    if (column == 6) {
+    if (column == 6)
+    {
         if ((!ui->tableK->item(row, column)->text().isEmpty())
-            && (ui->tableK->item(row, column)->text() != "-")) {
+            && (ui->tableK->item(row, column)->text() != "-"))
+        {
             QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
             QDesktopServices::openUrl(
                 QUrl(ui->tableK->item(row, column)->text(), QUrl::TolerantMode));
@@ -562,7 +600,7 @@ void MainWindow::openWebTableK(int row, int column)
 
 void MainWindow::saveColumnWidth()
 {
-    StrDebug;
+    StrDebug();
 
     // width of the columns in the towary "goods" tab
     sett().setValue("towCol0", ui->tableT->columnWidth(0));
@@ -607,7 +645,7 @@ void MainWindow::saveColumnWidth()
 
 void MainWindow::saveAllSettAsDefault()
 {
-    StrDebug;
+    StrDebug();
     sett().resetSettings();
 }
 
@@ -616,7 +654,7 @@ void MainWindow::saveAllSettAsDefault()
 
 void MainWindow::saveAllSett()
 {
-    StrDebug;
+    StrDebug();
 
     // saves filtr
     sett().setValue("filtrStart", ui->filtrStart->text());
@@ -637,7 +675,7 @@ void MainWindow::saveAllSett()
 
 void MainWindow::tableClear(QTableWidget *tab)
 {
-    StrDebug;
+    StrDebug();
     tab->setRowCount(0);
 }
 
@@ -646,18 +684,19 @@ void MainWindow::tableClear(QTableWidget *tab)
 
 void MainWindow::insertRow(QTableWidget *t, int row)
 {
-    StrDebug;
+    StrDebug();
 
     t->insertRow(row);
 
-    for (int i = 0; i < t->columnCount(); i++) {
+    for (int i = 0; i < t->columnCount(); i++)
+    {
         t->setItem(row, i, new QTableWidgetItem());
     }
 }
 
 int MainWindow::getMaxSymbol() const
 {
-    StrDebug;
+    StrDebug();
 
     int max = *std::max_element(allSymbols.begin(), allSymbols.end());
 
@@ -666,7 +705,7 @@ int MainWindow::getMaxSymbol() const
 
 int MainWindow::getMaxSymbolWarehouse() const
 {
-    StrDebug;
+    StrDebug();
 
     int max = *std::max_element(allSymbolsWarehouse.begin(), allSymbolsWarehouse.end());
     return max;
@@ -678,14 +717,15 @@ int MainWindow::getMaxSymbolWarehouse() const
 
 void MainWindow::readHist()
 {
-    StrDebug;
+    StrDebug();
 
     QVector<InvoiceData> invoicesVec;
     invoicesVec = dl->invoiceSelectAllData(ui->filtrStart->date(), ui->filtrEnd->date());
     allSymbols = dl->getAllSymbols();
     ui->tableH->setSortingEnabled(false);
 
-    for (int i = 0; i < invoicesVec.size(); ++i) {
+    for (int i = 0; i < invoicesVec.size(); ++i)
+    {
         insertRow(ui->tableH, ui->tableH->rowCount());
         QString text = invoicesVec.at(i).id;
         ui->tableH->item(ui->tableH->rowCount() - 1, 0)->setText(text);
@@ -693,9 +733,8 @@ void MainWindow::readHist()
         text = invoicesVec.at(i).invNr;
         ui->tableH->item(ui->tableH->rowCount() - 1, 1)->setText(text);
         qDebug("Added file name");
-        ui->tableH->setItem(ui->tableH->rowCount() - 1,
-                            2,
-                            new DateWidgetItem(invoicesVec.at(i).sellingDate));
+        ui->tableH->setItem(
+            ui->tableH->rowCount() - 1, 2, new DateWidgetItem(invoicesVec.at(i).sellingDate));
         qDebug("Added file date");
         text = invoicesVec.at(i).type;
         ui->tableH->item(ui->tableH->rowCount() - 1, 3)->setText(text);
@@ -717,14 +756,16 @@ void MainWindow::readHist()
 
 void MainWindow::readWarehouses()
 {
-    StrDebug;
+    StrDebug();
 
     QVector<WarehouseData> wareVec;
-    wareVec = dl->warehouseSelectAllData(ui->warehouseFromDate->date(), ui->warehouseToDate->date());
+    wareVec =
+        dl->warehouseSelectAllData(ui->warehouseFromDate->date(), ui->warehouseToDate->date());
     allSymbolsWarehouse = dl->getAllSymbolsWarehouse();
     ui->tableM->setSortingEnabled(false);
 
-    for (int i = 0; i < wareVec.size(); ++i) {
+    for (int i = 0; i < wareVec.size(); ++i)
+    {
         insertRow(ui->tableM, ui->tableM->rowCount());
         QString text = wareVec.at(i).id;
         ui->tableM->item(ui->tableM->rowCount() - 1, 0)->setText(text);
@@ -732,9 +773,8 @@ void MainWindow::readWarehouses()
         text = wareVec.at(i).invNr;
         ui->tableM->item(ui->tableM->rowCount() - 1, 1)->setText(text);
         qDebug("Added file name");
-        ui->tableM->setItem(ui->tableM->rowCount() - 1,
-                            2,
-                            new DateWidgetItem(wareVec.at(i).sellingDate));
+        ui->tableM->setItem(
+            ui->tableM->rowCount() - 1, 2, new DateWidgetItem(wareVec.at(i).sellingDate));
         qDebug("Added file date");
         text = wareVec.at(i).type;
         ui->tableM->item(ui->tableM->rowCount() - 1, 3)->setText(text);
@@ -755,13 +795,14 @@ void MainWindow::readWarehouses()
 
 void MainWindow::readBuyer()
 {
-    StrDebug;
+    StrDebug();
 
     tableClear(ui->tableK);
     ui->tableK->setSortingEnabled(false);
     QVector<BuyerData> buyerVec = dl->buyersSelectAllData();
 
-    for (int i = 0; i < buyerVec.size(); ++i) {
+    for (int i = 0; i < buyerVec.size(); ++i)
+    {
         qDebug() << "liczba kolumn: " << ui->tableK->columnCount();
         insertRow(ui->tableK, ui->tableK->rowCount());
         QString text = buyerVec.at(i).name;
@@ -790,12 +831,13 @@ void MainWindow::readBuyer()
 
 void MainWindow::readGoods()
 {
-    StrDebug;
+    StrDebug();
 
     tableClear(ui->tableT);
     QVector<ProductData> prodVec = dl->productsSelectAllData();
 
-    for (int i = 0; i < prodVec.size(); ++i) {
+    for (int i = 0; i < prodVec.size(); ++i)
+    {
         insertRow(ui->tableT, ui->tableT->rowCount());
         QString text = QString::number(prodVec.at(i).id);
         ui->tableT->item(ui->tableT->rowCount() - 1, 0)->setText(text);
@@ -831,27 +873,31 @@ void MainWindow::readGoods()
 
 void MainWindow::setupDir()
 {
-    StrDebug;
+    StrDebug();
 
     workingDir = sett().getWorkingDir();
     QDir dir(workingDir);
     QDir mainPath(QDir::homePath() + "/.local/share/data");
 
-    if (!mainPath.exists()) {
+    if (!mainPath.exists())
+    {
         mainPath.mkpath(QDir::homePath() + "/.local/share/data");
     }
 
-    if (!dir.exists()) {
+    if (!dir.exists())
+    {
         dir.mkdir(workingDir);
         dir.mkdir(workingDir + sett().getDataDir());
         dir.mkdir(workingDir + sett().getWarehouseDir());
     }
 
-    if (!dir.exists(workingDir + sett().getDataDir())) {
+    if (!dir.exists(workingDir + sett().getDataDir()))
+    {
         dir.mkdir(workingDir + sett().getDataDir());
     }
 
-    if (!dir.exists(workingDir + sett().getWarehouseDir())) {
+    if (!dir.exists(workingDir + sett().getWarehouseDir()))
+    {
         dir.mkdir(workingDir + sett().getWarehouseDir());
     }
 }
@@ -861,14 +907,17 @@ void MainWindow::setupDir()
 
 void MainWindow::keyPressEvent(QKeyEvent *event)
 {
-    StrDebug;
+    StrDebug();
 
-    if (event->key() == Qt::Key_F5) {
+    if (event->key() == Qt::Key_F5)
+    {
         newInv();
     }
 
-    if (event->key() == Qt::Key_Return) {
-        switch (ui->tabWidget2->currentIndex()) {
+    if (event->key() == Qt::Key_Return)
+    {
+        switch (ui->tabWidget2->currentIndex())
+        {
         case 0: {
             editFHist();
             break;
@@ -884,20 +933,26 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
         }
     }
 
-    if (event->modifiers() == Qt::ControlModifier && event->key() == Qt::Key_PageUp) {
-        if (ui->tabWidget2->currentIndex() != ui->tabWidget2->count() - 1) {
+    if (event->modifiers() == Qt::ControlModifier && event->key() == Qt::Key_PageUp)
+    {
+        if (ui->tabWidget2->currentIndex() != ui->tabWidget2->count() - 1)
+        {
             ui->tabWidget2->setCurrentIndex(ui->tabWidget2->currentIndex() + 1);
-
-        } else {
+        }
+        else
+        {
             ui->tabWidget2->setCurrentIndex(0);
         }
     }
 
-    if (event->modifiers() == Qt::ControlModifier && event->key() == Qt::Key_PageDown) {
-        if (ui->tabWidget2->currentIndex() != 0) {
+    if (event->modifiers() == Qt::ControlModifier && event->key() == Qt::Key_PageDown)
+    {
+        if (ui->tabWidget2->currentIndex() != 0)
+        {
             ui->tabWidget2->setCurrentIndex(ui->tabWidget2->currentIndex() - 1);
-
-        } else {
+        }
+        else
+        {
             ui->tabWidget2->setCurrentIndex(ui->tabWidget2->count() - 1);
         }
     }
@@ -909,7 +964,7 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
 
 void MainWindow::showTableMenuT(QPoint p)
 {
-    StrDebug;
+    StrDebug();
 
     QMenu *menuTableT = new QMenu(ui->tableT);
     menuTableT->addAction(ui->addGoodsAction);
@@ -926,7 +981,7 @@ void MainWindow::showTableMenuT(QPoint p)
  */
 void MainWindow::showTableMenuK(QPoint p)
 {
-    StrDebug;
+    StrDebug();
 
     auto menuTable = std::make_unique<QMenu>(ui->tableK);
 
@@ -938,7 +993,7 @@ void MainWindow::showTableMenuK(QPoint p)
 
 void MainWindow::showTableMenuM(QPoint p)
 {
-    StrDebug;
+    StrDebug();
 
     auto menuTable = std::make_unique<QMenu>(ui->tableM);
 
@@ -954,7 +1009,7 @@ void MainWindow::showTableMenuM(QPoint p)
  */
 void MainWindow::showTableMenuH(QPoint p)
 {
-    StrDebug;
+    StrDebug();
 
     auto menuTable = std::make_unique<QMenu>(ui->tableH);
 
@@ -983,17 +1038,17 @@ void MainWindow::mainUpdateStatus(QTableWidgetItem *item)
     // QMainWindow and UiMainWindow are the same... I guess there is a way to
     // avoid it.
 
-    StrDebug;
+    StrDebug();
 
     QStatusBar *stat = qobject_cast<QMainWindow *>(this)->statusBar();
 
     QTableWidget *table = item->tableWidget();
     QString message = QString();
 
-    message += table->horizontalHeaderItem(1)->text() + " : " + table->item(item->row(), 1)->text()
-               + ", ";
-    message += table->horizontalHeaderItem(2)->text() + " : " + table->item(item->row(), 2)->text()
-               + ", ";
+    message +=
+        table->horizontalHeaderItem(1)->text() + " : " + table->item(item->row(), 1)->text() + ", ";
+    message +=
+        table->horizontalHeaderItem(2)->text() + " : " + table->item(item->row(), 2)->text() + ", ";
     message += table->horizontalHeaderItem(3)->text() + " : " + table->item(item->row(), 3)->text();
 
     stat->showMessage(trUtf8("Wybrana pozycja: ") + message);
@@ -1007,31 +1062,37 @@ void MainWindow::mainUpdateStatus(QTableWidgetItem *item)
 void MainWindow::tabChanged()
 {
     // history
-    if (ui->tableH->rowCount() != 0) {
+    if (ui->tableH->rowCount() != 0)
+    {
         ui->invoiceEdAction->setEnabled(true);
         ui->invoiceDelAction->setEnabled(true);
-
-    } else {
+    }
+    else
+    {
         ui->invoiceEdAction->setDisabled(true);
         ui->invoiceDelAction->setDisabled(true);
     }
 
     // buyers
-    if (ui->tableK->rowCount() != 0) {
+    if (ui->tableK->rowCount() != 0)
+    {
         ui->editBuyersAction->setEnabled(true);
         ui->delBuyersAction->setEnabled(true);
-
-    } else {
+    }
+    else
+    {
         ui->editBuyersAction->setDisabled(true);
         ui->delBuyersAction->setDisabled(true);
     }
 
     // goods
-    if (ui->tableT->rowCount() != 0) {
+    if (ui->tableT->rowCount() != 0)
+    {
         ui->editGoodsAction->setEnabled(true);
         ui->delGoodsAction->setEnabled(true);
-
-    } else {
+    }
+    else
+    {
         ui->editGoodsAction->setDisabled(true);
         ui->delGoodsAction->setDisabled(true);
     }
@@ -1041,14 +1102,17 @@ void MainWindow::tabChanged()
  */
 void MainWindow::rereadHist(bool)
 {
-    StrDebug;
+    StrDebug();
 
-    if (ui->filtrStart->date() > ui->filtrEnd->date()) {
-        QMessageBox::information(this,
-                                 trUtf8("Filtr dat"),
-                                 trUtf8("Data początkowa nie może być większa od daty końcowej"));
-
-    } else {
+    if (ui->filtrStart->date() > ui->filtrEnd->date())
+    {
+        QMessageBox::information(
+            this,
+            trUtf8("Filtr dat"),
+            trUtf8("Data początkowa nie może być większa od daty końcowej"));
+    }
+    else
+    {
         tableClear(ui->tableH);
         ui->tableH->setSortingEnabled(false);
         readHist();
@@ -1059,14 +1123,17 @@ void MainWindow::rereadHist(bool)
  */
 void MainWindow::rereadWarehouses(bool)
 {
-    StrDebug;
+    StrDebug();
 
-    if (ui->warehouseFromDate->date() > ui->warehouseToDate->date()) {
-        QMessageBox::information(this,
-                                 trUtf8("Filtr dat"),
-                                 trUtf8("Data początkowa nie może być większa od daty końcowej"));
-
-    } else {
+    if (ui->warehouseFromDate->date() > ui->warehouseToDate->date())
+    {
+        QMessageBox::information(
+            this,
+            trUtf8("Filtr dat"),
+            trUtf8("Data początkowa nie może być większa od daty końcowej"));
+    }
+    else
+    {
         tableClear(ui->tableM);
         ui->tableM->setSortingEnabled(false);
         readWarehouses();
@@ -1078,7 +1145,7 @@ void MainWindow::rereadWarehouses(bool)
 
 void MainWindow::aboutProg()
 {
-    StrDebug;
+    StrDebug();
 
     QMessageBox::about(
         this,
@@ -1119,33 +1186,36 @@ void MainWindow::aboutProg()
 
 void MainWindow::editFHist()
 {
-    StrDebug;
+    StrDebug();
 
-    if (ui->tableH->selectedItems().count() <= 0) {
-        QMessageBox::information(this,
-                                 trUtf8("QFaktury"),
-                                 trUtf8("Faktura nie wybrana. Nie mozna edytować."),
-                                 trUtf8("Ok"),
-                                 nullptr,
-                                 nullptr,
-                                 1);
+    if (ui->tableH->selectedItems().count() <= 0)
+    {
+        QMessageBox::information(
+            this,
+            trUtf8("QFaktury"),
+            trUtf8("Faktura nie wybrana. Nie mozna edytować."),
+            trUtf8("Ok"),
+            nullptr,
+            nullptr,
+            1);
         return;
     }
 
     ui->tableH->setSortingEnabled(false);
 
-    int row {0};
+    int row { 0 };
 
     row = ui->tableH->selectedItems().at(0)->row();
 
-    if (ui->tableH->item(row, 3)->text() == trUtf8("korekta")) {
-
+    if (ui->tableH->item(row, 3)->text() == trUtf8("korekta"))
+    {
         auto corWindow = std::make_unique<Correction>(this, dl, s_WIN_CORRECT_EDIT, true);
 
         corWindow->correctionInit(true);
         corWindow->readCorrData(ui->tableH->item(row, 0)->text());
 
-        if (corWindow->exec() == QDialog::Accepted) {
+        if (corWindow->exec() == QDialog::Accepted)
+        {
             rereadHist(true);
         }
 
@@ -1153,21 +1223,25 @@ void MainWindow::editFHist()
             readBuyer();
     }
 
-    if (ui->tableH->item(row, 3)->text() == trUtf8("kbrutto")) {
-
+    if (ui->tableH->item(row, 3)->text() == trUtf8("kbrutto"))
+    {
         auto corWindow = std::make_unique<CorrectGross>(this, dl, s_WIN_CORRECT_EDIT, true);
 
         corWindow->correctionInit(true);
         corWindow->readCorrData(ui->tableH->item(row, 0)->text());
 
-        if (shouldHidden) {
+        if (shouldHidden)
+        {
             QSizePolicy sp_retain = corWindow->sizePolicy();
             sp_retain.setRetainSizeWhenHidden(true);
             corWindow->setSizePolicy(sp_retain);
             corWindow->hide();
             corWindow->makeInvoice(false);
-        } else {
-            if (corWindow->exec() == QDialog::Accepted) {
+        }
+        else
+        {
+            if (corWindow->exec() == QDialog::Accepted)
+            {
                 rereadHist(true);
             }
 
@@ -1176,8 +1250,8 @@ void MainWindow::editFHist()
         }
     }
 
-    if (ui->tableH->item(row, 3)->text() == trUtf8("rachunek")) {
-
+    if (ui->tableH->item(row, 3)->text() == trUtf8("rachunek"))
+    {
         auto billWindow = std::make_unique<Bill>(this, dl, s_BILL_EDIT);
 
         billWindow->readData(ui->tableH->item(row, 0)->text());
@@ -1185,14 +1259,18 @@ void MainWindow::editFHist()
         billWindow->billInit();
         billWindow->setWindowTitle(trUtf8("Edytuje Rachunek"));
 
-        if (shouldHidden) {
+        if (shouldHidden)
+        {
             QSizePolicy sp_retain = billWindow->sizePolicy();
             sp_retain.setRetainSizeWhenHidden(true);
             billWindow->setSizePolicy(sp_retain);
             billWindow->hide();
             billWindow->makeInvoice(false);
-        } else {
-            if (billWindow->exec() == QDialog::Accepted) {
+        }
+        else
+        {
+            if (billWindow->exec() == QDialog::Accepted)
+            {
                 rereadHist(true);
             }
 
@@ -1201,21 +1279,25 @@ void MainWindow::editFHist()
         }
     }
 
-    if (ui->tableH->item(row, 3)->text() == trUtf8("FVAT")) {
-
+    if (ui->tableH->item(row, 3)->text() == trUtf8("FVAT"))
+    {
         auto invWindow = std::make_unique<Invoice>(this, dl, s_WIN_INVOICE_EDIT);
 
         invWindow->readData(ui->tableH->item(row, 0)->text());
         invWindow->setfName(ui->tableH->item(row, 0)->text());
 
-        if (shouldHidden) {
+        if (shouldHidden)
+        {
             QSizePolicy sp_retain = invWindow->sizePolicy();
             sp_retain.setRetainSizeWhenHidden(true);
             invWindow->setSizePolicy(sp_retain);
             invWindow->hide();
             invWindow->makeInvoice(false);
-        } else {
-            if (invWindow->exec() == QDialog::Accepted) {
+        }
+        else
+        {
+            if (invWindow->exec() == QDialog::Accepted)
+            {
                 rereadHist(true);
             }
 
@@ -1224,22 +1306,26 @@ void MainWindow::editFHist()
         }
     }
 
-    if (ui->tableH->item(row, 3)->text() == trUtf8("RR")) {
-
-        auto invWindow = std::make_unique<InvoiceRR> (this, dl, s_RR);
+    if (ui->tableH->item(row, 3)->text() == trUtf8("RR"))
+    {
+        auto invWindow = std::make_unique<InvoiceRR>(this, dl, s_RR);
 
         invWindow->invoiceRRInit();
         invWindow->readData(ui->tableH->item(row, 0)->text());
         invWindow->setfName(ui->tableH->item(row, 0)->text());
 
-        if (shouldHidden) {
+        if (shouldHidden)
+        {
             QSizePolicy sp_retain = invWindow->sizePolicy();
             sp_retain.setRetainSizeWhenHidden(true);
             invWindow->setSizePolicy(sp_retain);
             invWindow->hide();
             invWindow->makeInvoice(false);
-        } else {
-            if (invWindow->exec() == QDialog::Accepted) {
+        }
+        else
+        {
+            if (invWindow->exec() == QDialog::Accepted)
+            {
                 rereadHist(true);
             }
 
@@ -1248,21 +1334,25 @@ void MainWindow::editFHist()
         }
     }
 
-    if (ui->tableH->item(row, 3)->text() == trUtf8("FPro")) {
-
+    if (ui->tableH->item(row, 3)->text() == trUtf8("FPro"))
+    {
         auto invWindow = std::make_unique<Invoice>(this, dl, s_WIN_PROFORMA_EDIT);
 
         invWindow->readData(ui->tableH->item(row, 0)->text());
         invWindow->setfName(ui->tableH->item(row, 0)->text());
 
-        if (shouldHidden) {
+        if (shouldHidden)
+        {
             QSizePolicy sp_retain = invWindow->sizePolicy();
             sp_retain.setRetainSizeWhenHidden(true);
             invWindow->setSizePolicy(sp_retain);
             invWindow->hide();
             invWindow->makeInvoice(false);
-        } else {
-            if (invWindow->exec() == QDialog::Accepted) {
+        }
+        else
+        {
+            if (invWindow->exec() == QDialog::Accepted)
+            {
                 rereadHist(true);
             }
 
@@ -1271,21 +1361,25 @@ void MainWindow::editFHist()
         }
     }
 
-    if (ui->tableH->item(row, 3)->text() == trUtf8("FBrutto")) {
-
+    if (ui->tableH->item(row, 3)->text() == trUtf8("FBrutto"))
+    {
         auto invWindow = std::make_unique<InvoiceGross>(this, dl, s_BR_INVOICE_EDIT);
 
         invWindow->readData(ui->tableH->item(row, 0)->text());
         invWindow->setfName(ui->tableH->item(row, 0)->text());
 
-        if (shouldHidden) {
+        if (shouldHidden)
+        {
             QSizePolicy sp_retain = invWindow->sizePolicy();
             sp_retain.setRetainSizeWhenHidden(true);
             invWindow->setSizePolicy(sp_retain);
             invWindow->hide();
             invWindow->makeInvoice(false);
-        } else {
-            if (invWindow->exec() == QDialog::Accepted) {
+        }
+        else
+        {
+            if (invWindow->exec() == QDialog::Accepted)
+            {
                 rereadHist(true);
             }
 
@@ -1294,8 +1388,8 @@ void MainWindow::editFHist()
         }
     }
 
-    if (ui->tableH->item(row, 3)->text() == trUtf8("duplikat")) {
-
+    if (ui->tableH->item(row, 3)->text() == trUtf8("duplikat"))
+    {
         auto dupWindow = std::make_unique<Duplicate>(this, dl, s_WIN_DUPLICATE_LOOK, true);
 
         dupWindow->readData(ui->tableH->item(row, 0)->text());
@@ -1303,14 +1397,18 @@ void MainWindow::editFHist()
         dupWindow->setIsEditAllowed(false);
         dupWindow->setfName(ui->tableH->item(row, 0)->text());
 
-        if (shouldHidden) {
+        if (shouldHidden)
+        {
             QSizePolicy sp_retain = dupWindow->sizePolicy();
             sp_retain.setRetainSizeWhenHidden(true);
             dupWindow->setSizePolicy(sp_retain);
             dupWindow->hide();
             dupWindow->makeInvoice(false);
-        } else {
-            if (dupWindow->exec() == QDialog::Accepted) {
+        }
+        else
+        {
+            if (dupWindow->exec() == QDialog::Accepted)
+            {
                 rereadHist(true);
             }
 
@@ -1323,42 +1421,46 @@ void MainWindow::editFHist()
 
 void MainWindow::warehouseEdit()
 {
-    StrDebug;
+    StrDebug();
 
-    if (ui->tableM->selectedItems().count() <= 0) {
-        QMessageBox::information(this,
-                                 trUtf8("QFaktury"),
-                                 trUtf8(
-                                     "Dokument magazynu nie został wybrany. Nie można edytować."),
-                                 trUtf8("Ok"),
-                                 nullptr,
-                                 nullptr,
-                                 1);
+    if (ui->tableM->selectedItems().count() <= 0)
+    {
+        QMessageBox::information(
+            this,
+            trUtf8("QFaktury"),
+            trUtf8("Dokument magazynu nie został wybrany. Nie można edytować."),
+            trUtf8("Ok"),
+            nullptr,
+            nullptr,
+            1);
         return;
     }
 
     ui->tableM->setSortingEnabled(false);
 
-    int row {0};
+    int row { 0 };
 
     row = ui->tableM->selectedItems().at(0)->row();
 
-    if (ui->tableM->item(row, 3)->text() == trUtf8("WZ")) {
-
+    if (ui->tableM->item(row, 3)->text() == trUtf8("WZ"))
+    {
         auto delivNoteWindow = std::make_unique<DeliveryNote>(this, dl, s_WZ);
 
         delivNoteWindow->readWarehouseData(ui->tableM->item(row, 0)->text());
         delivNoteWindow->setfName(ui->tableM->item(row, 0)->text());
 
-        if (shouldHidden) {
+        if (shouldHidden)
+        {
             QSizePolicy sp_retain = delivNoteWindow->sizePolicy();
             sp_retain.setRetainSizeWhenHidden(true);
             delivNoteWindow->setSizePolicy(sp_retain);
             delivNoteWindow->hide();
             delivNoteWindow->makeInvoice(false);
-
-        } else {
-            if (delivNoteWindow->exec() == QDialog::Accepted) {
+        }
+        else
+        {
+            if (delivNoteWindow->exec() == QDialog::Accepted)
+            {
                 rereadWarehouses(true);
                 rereadHist(true);
             }
@@ -1368,22 +1470,25 @@ void MainWindow::warehouseEdit()
         }
     }
 
-    if (ui->tableM->item(row, 3)->text() == trUtf8("RW")) {
-
+    if (ui->tableM->item(row, 3)->text() == trUtf8("RW"))
+    {
         auto goodsNoteWindow = std::make_unique<GoodsIssuedNotes>(this, dl, s_RW);
 
         goodsNoteWindow->readWarehouseData(ui->tableM->item(row, 0)->text());
         goodsNoteWindow->setfName(ui->tableM->item(row, 0)->text());
 
-        if (shouldHidden) {
+        if (shouldHidden)
+        {
             QSizePolicy sp_retain = goodsNoteWindow->sizePolicy();
             sp_retain.setRetainSizeWhenHidden(true);
             goodsNoteWindow->setSizePolicy(sp_retain);
             goodsNoteWindow->hide();
             goodsNoteWindow->makeInvoice(false);
-
-        } else {
-            if (goodsNoteWindow->exec() == QDialog::Accepted) {
+        }
+        else
+        {
+            if (goodsNoteWindow->exec() == QDialog::Accepted)
+            {
                 rereadWarehouses(true);
             }
 
@@ -1396,28 +1501,32 @@ void MainWindow::warehouseEdit()
 
 void MainWindow::delFHist()
 {
-    StrDebug;
+    StrDebug();
 
-    if (ui->tableH->selectedItems().count() <= 0) {
-        QMessageBox::information(this,
-                                 trUtf8("QFaktury"),
-                                 trUtf8("Faktura nie została wybrana. Nie można usuwać."),
-                                 trUtf8("Ok"),
-                                 nullptr,
-                                 nullptr,
-                                 1);
+    if (ui->tableH->selectedItems().count() <= 0)
+    {
+        QMessageBox::information(
+            this,
+            trUtf8("QFaktury"),
+            trUtf8("Faktura nie została wybrana. Nie można usuwać."),
+            trUtf8("Ok"),
+            nullptr,
+            nullptr,
+            1);
         return;
     }
 
-    if (QMessageBox::warning(this,
-                             sett().getVersion(qAppName()),
-                             trUtf8("Czy napewno chcesz usunąć tą fakturę z historii?"),
-                             trUtf8("Tak"),
-                             trUtf8("Nie"),
-                             nullptr,
-                             0,
-                             1)
-        == 0) {
+    if (QMessageBox::warning(
+            this,
+            sett().getVersion(qAppName()),
+            trUtf8("Czy napewno chcesz usunąć tą fakturę z historii?"),
+            trUtf8("Tak"),
+            trUtf8("Nie"),
+            nullptr,
+            0,
+            1)
+        == 0)
+    {
         QString name = ui->tableH->item(ui->tableH->currentRow(), 0)->text();
         dl->invoiceDeleteData(name);
         ui->tableH->removeRow(ui->tableH->currentRow());
@@ -1427,28 +1536,32 @@ void MainWindow::delFHist()
 
 void MainWindow::delMHist()
 {
-    StrDebug;
+    StrDebug();
 
-    if (ui->tableM->selectedItems().count() <= 0) {
-        QMessageBox::information(this,
-                                 trUtf8("QFaktury"),
-                                 trUtf8("Dokument magazynu nie został wybrany. Nie można usuwać."),
-                                 trUtf8("Ok"),
-                                 nullptr,
-                                 nullptr,
-                                 1);
+    if (ui->tableM->selectedItems().count() <= 0)
+    {
+        QMessageBox::information(
+            this,
+            trUtf8("QFaktury"),
+            trUtf8("Dokument magazynu nie został wybrany. Nie można usuwać."),
+            trUtf8("Ok"),
+            nullptr,
+            nullptr,
+            1);
         return;
     }
 
-    if (QMessageBox::warning(this,
-                             sett().getVersion(qAppName()),
-                             trUtf8("Czy napewno chcesz usunąć ten dokument magazynu z historii?"),
-                             trUtf8("Tak"),
-                             trUtf8("Nie"),
-                             nullptr,
-                             0,
-                             1)
-        == 0) {
+    if (QMessageBox::warning(
+            this,
+            sett().getVersion(qAppName()),
+            trUtf8("Czy napewno chcesz usunąć ten dokument magazynu z historii?"),
+            trUtf8("Tak"),
+            trUtf8("Nie"),
+            nullptr,
+            0,
+            1)
+        == 0)
+    {
         QString name = ui->tableM->item(ui->tableM->currentRow(), 0)->text();
         dl->warehouseDeleteData(name);
         ui->tableM->removeRow(ui->tableM->currentRow());
@@ -1461,7 +1574,7 @@ void MainWindow::delMHist()
 
 void MainWindow::userDataClick()
 {
-    StrDebug;
+    StrDebug();
 
     auto userDataWindow = std::make_unique<User>(this);
     userDataWindow->exec();
@@ -1472,7 +1585,7 @@ void MainWindow::userDataClick()
 
 void MainWindow::settClick()
 {
-    StrDebug;
+    StrDebug();
 
     auto settWindow = std::make_unique<Setting>(this);
     settWindow->exec();
@@ -1483,11 +1596,12 @@ void MainWindow::settClick()
 
 void MainWindow::buyerClick()
 {
-    StrDebug;
+    StrDebug();
 
     auto buyersWindow = std::make_unique<Buyers>(this, 0, dl);
 
-    if (buyersWindow->exec() == QDialog::Accepted) {
+    if (buyersWindow->exec() == QDialog::Accepted)
+    {
         ui->tableK->setSortingEnabled(false);
         insertRow(ui->tableK, ui->tableK->rowCount());
 
@@ -1509,30 +1623,33 @@ void MainWindow::buyerClick()
 
 void MainWindow::buyerDel()
 {
-    StrDebug;
+    StrDebug();
 
-    if (ui->tableK->selectedItems().count() <= 0) {
-        QMessageBox::information(this,
-                                 trUtf8("QFaktury"),
-                                 trUtf8("Kontrahent nie został wybrany. Nie można usuwac."),
-                                 trUtf8("Ok"),
-                                 nullptr,
-                                 nullptr,
-                                 1);
+    if (ui->tableK->selectedItems().count() <= 0)
+    {
+        QMessageBox::information(
+            this,
+            trUtf8("QFaktury"),
+            trUtf8("Kontrahent nie został wybrany. Nie można usuwac."),
+            trUtf8("Ok"),
+            nullptr,
+            nullptr,
+            1);
         return;
     }
 
-    if (QMessageBox::warning(this,
-                             trUtf8("QFaktury"),
-                             trUtf8("Czy napewno chcesz usunąć kontrahenta: ")
-                                 + ui->tableK->item(ui->tableK->currentRow(), 0)->text()
-                                 + trUtf8(" ?"),
-                             trUtf8("Tak"),
-                             trUtf8("Nie"),
-                             nullptr,
-                             0,
-                             1)
-        == 0) {
+    if (QMessageBox::warning(
+            this,
+            trUtf8("QFaktury"),
+            trUtf8("Czy napewno chcesz usunąć kontrahenta: ")
+                + ui->tableK->item(ui->tableK->currentRow(), 0)->text() + trUtf8(" ?"),
+            trUtf8("Tak"),
+            trUtf8("Nie"),
+            nullptr,
+            0,
+            1)
+        == 0)
+    {
         dl->buyersDeleteData(ui->tableK->item(ui->tableK->currentRow(), 0)->text());
         ui->tableK->removeRow(ui->tableK->currentRow());
     }
@@ -1543,16 +1660,18 @@ void MainWindow::buyerDel()
 
 void MainWindow::buyerEd()
 {
-    StrDebug;
+    StrDebug();
 
-    if (ui->tableK->selectedItems().count() <= 0) {
-        QMessageBox::information(this,
-                                 trUtf8("QFaktury"),
-                                 trUtf8("Kontrahent nie został wybrany."),
-                                 trUtf8("Ok"),
-                                 nullptr,
-                                 nullptr,
-                                 1);
+    if (ui->tableK->selectedItems().count() <= 0)
+    {
+        QMessageBox::information(
+            this,
+            trUtf8("QFaktury"),
+            trUtf8("Kontrahent nie został wybrany."),
+            trUtf8("Ok"),
+            nullptr,
+            nullptr,
+            1);
         return;
     }
 
@@ -1560,10 +1679,11 @@ void MainWindow::buyerEd()
 
     auto buyersWindow = std::make_unique<Buyers>(this, 1, dl);
 
-    buyersWindow->selectData(ui->tableK->item(row, 0)->text(),
-                             sett().getCustomerType(ui->tableK->item(row, 1)->text()));
+    buyersWindow->selectData(
+        ui->tableK->item(row, 0)->text(), sett().getCustomerType(ui->tableK->item(row, 1)->text()));
 
-    if (buyersWindow->exec() == QDialog::Accepted) {
+    if (buyersWindow->exec() == QDialog::Accepted)
+    {
         ui->tableK->setSortingEnabled(false);
         QStringList rowTxt = buyersWindow->getRetBuyer().split("|");
         ui->tableK->item(row, 0)->setText(rowTxt[0]); // name
@@ -1579,7 +1699,7 @@ void MainWindow::buyerEd()
 
 void MainWindow::printBuyerList()
 {
-    StrDebug;
+    StrDebug();
 
     QPrinter printer(QPrinter::HighResolution);
     QPrintPreviewDialog preview(&printer, this);
@@ -1589,15 +1709,17 @@ void MainWindow::printBuyerList()
 
     connect(&preview, SIGNAL(paintRequested(QPrinter *)), this, SLOT(printList(QPrinter *)));
 
-    if (preview.exec() == 1) {
-        QMessageBox::warning(this,
-                             trUtf8("Drukowanie"),
-                             trUtf8("Prawdopobnie nie masz skonfigurowanej drukarki. Wykrywana "
-                                    "nazwa domyślnej drukarki to: ")
-                                 + printer.printerName()
-                                 + trUtf8(". Status domyślnej drukarki (poprawny o ile drukarka ma "
-                                          "możliwość raportowania statusu do systemu): ")
-                                 + printer.printerState());
+    if (preview.exec() == 1)
+    {
+        QMessageBox::warning(
+            this,
+            trUtf8("Drukowanie"),
+            trUtf8("Prawdopobnie nie masz skonfigurowanej drukarki. Wykrywana "
+                   "nazwa domyślnej drukarki to: ")
+                + printer.printerName()
+                + trUtf8(". Status domyślnej drukarki (poprawny o ile drukarka ma "
+                         "możliwość raportowania statusu do systemu): ")
+                + printer.printerState());
     }
 }
 
@@ -1607,9 +1729,10 @@ void MainWindow::printBuyerList()
 
 void MainWindow::printList(QPrinter *printer)
 {
-    StrDebug;
+    StrDebug();
 
-    if (ui->tableK->rowCount() != 0) {
+    if (ui->tableK->rowCount() != 0)
+    {
         QTextDocument doc(trUtf8("Lista kontrahentów"));
         QStringList list = QStringList();
         list << "<!doctype html>"
@@ -1624,7 +1747,8 @@ void MainWindow::printList(QPrinter *printer)
 
         QVector<BuyerData> buyerVec = dl->buyersSelectAllData();
 
-        for (int i = 0; i < buyerVec.size(); ++i) {
+        for (int i = 0; i < buyerVec.size(); ++i)
+        {
             QString text = buyerVec.at(i).name;
             list << "<strong>" + trUtf8("Nazwa:  ") + "</strong>" + changeIfEmpty(text);
             list << "<br/>";
@@ -1657,17 +1781,19 @@ void MainWindow::printList(QPrinter *printer)
 
         QFile file(sett().getWorkingDir() + "/buyerContacts.html");
 
-        bool removed {false};
+        bool removed { false };
 
         if (file.exists())
             removed = file.remove();
 
-        if (!removed) {
+        if (!removed)
+        {
             QFile(file.fileName()).setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
             file.remove();
         }
 
-        if (!file.open(QIODevice::WriteOnly)) {
+        if (!file.open(QIODevice::WriteOnly))
+        {
             QFile(file.fileName()).setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
         }
 
@@ -1680,19 +1806,22 @@ void MainWindow::printList(QPrinter *printer)
 
         doc.setHtml(list.join(" "));
         doc.print(printer);
-
-    } else {
-        if (QMessageBox::warning(this,
-                                 trUtf8("Brak kontrahentów"),
-                                 trUtf8("Aby móc wydrukować listę kontaktów, musisz mieć "
-                                        "wprowadzonego co najmniej jednego kontrahenta do tabeli. "
-                                        "Czy chcesz dodać teraz dane twojego kontrahenta?"),
-                                 trUtf8("Tak"),
-                                 trUtf8("Nie"),
-                                 nullptr,
-                                 0,
-                                 1)
-            == 0) {
+    }
+    else
+    {
+        if (QMessageBox::warning(
+                this,
+                trUtf8("Brak kontrahentów"),
+                trUtf8("Aby móc wydrukować listę kontaktów, musisz mieć "
+                       "wprowadzonego co najmniej jednego kontrahenta do tabeli. "
+                       "Czy chcesz dodać teraz dane twojego kontrahenta?"),
+                trUtf8("Tak"),
+                trUtf8("Nie"),
+                nullptr,
+                0,
+                1)
+            == 0)
+        {
             buyerClick();
         }
     }
@@ -1700,13 +1829,16 @@ void MainWindow::printList(QPrinter *printer)
 
 QString MainWindow::changeIfEmpty(QString text)
 {
-    StrDebug;
+    StrDebug();
 
     QString result = QString();
 
-    if (text.isEmpty()) {
+    if (text.isEmpty())
+    {
         result = "-";
-    } else {
+    }
+    else
+    {
         result = text;
     }
 
@@ -1718,11 +1850,12 @@ QString MainWindow::changeIfEmpty(QString text)
 
 void MainWindow::newInv()
 {
-    StrDebug;
+    StrDebug();
 
     auto invWindow = std::make_unique<Invoice>(this, dl, s_INVOICE);
 
-    if (QDialog::Accepted == invWindow->exec()) {
+    if (QDialog::Accepted == invWindow->exec())
+    {
         ui->tableH->setSortingEnabled(false);
         insertRow(ui->tableH, ui->tableH->rowCount());
 
@@ -1735,7 +1868,9 @@ void MainWindow::newInv()
         ui->tableH->item(ui->tableH->rowCount() - 1, 4)->setText(row[4]); // buyer
         ui->tableH->item(ui->tableH->rowCount() - 1, 5)->setText(row[5]); // NIP
         ui->tableH->setSortingEnabled(true);
-    } else {
+    }
+    else
+    {
         rereadHist(true);
     }
 
@@ -1748,13 +1883,14 @@ void MainWindow::newInv()
 
 void MainWindow::newInvRR()
 {
-    StrDebug;
+    StrDebug();
 
     auto invWindow = std::make_unique<InvoiceRR>(this, dl, s_RR);
 
     invWindow->invoiceRRInit();
 
-    if (invWindow->exec() == QDialog::Accepted) {
+    if (invWindow->exec() == QDialog::Accepted)
+    {
         ui->tableH->setSortingEnabled(false);
         insertRow(ui->tableH, ui->tableH->rowCount());
 
@@ -1767,7 +1903,9 @@ void MainWindow::newInvRR()
         ui->tableH->item(ui->tableH->rowCount() - 1, 4)->setText(row[4]); // buyer
         ui->tableH->item(ui->tableH->rowCount() - 1, 5)->setText(row[5]); // NIP
         ui->tableH->setSortingEnabled(true);
-    } else {
+    }
+    else
+    {
         rereadHist(true);
     }
 
@@ -1782,15 +1920,15 @@ void MainWindow::newInvRR()
  */
 void MainWindow::newInvBill()
 {
-    StrDebug;
+    StrDebug();
 
     auto billWindow = std::make_unique<Bill>(this, dl, s_BILL);
 
     billWindow->setWindowTitle(trUtf8("Rachunek"));
     billWindow->billInit();
 
-    if (billWindow->exec() == QDialog::Accepted) {
-
+    if (billWindow->exec() == QDialog::Accepted)
+    {
         ui->tableH->setSortingEnabled(false);
         insertRow(ui->tableH, ui->tableH->rowCount());
 
@@ -1803,7 +1941,9 @@ void MainWindow::newInvBill()
         ui->tableH->item(ui->tableH->rowCount() - 1, 4)->setText(row[4]); // buyer
         ui->tableH->item(ui->tableH->rowCount() - 1, 5)->setText(row[5]); // NIP
         ui->tableH->setSortingEnabled(true);
-    } else {
+    }
+    else
+    {
         rereadHist(true);
     }
 
@@ -1818,14 +1958,14 @@ void MainWindow::newInvBill()
  */
 void MainWindow::newInvGross()
 {
-    StrDebug;
+    StrDebug();
 
     auto invWindow = std::make_unique<InvoiceGross>(this, dl, s_FBRUTTO);
 
     invWindow->setWindowTitle(trUtf8("Faktura VAT Brutto"));
 
-    if (invWindow->exec() == QDialog::Accepted) {
-
+    if (invWindow->exec() == QDialog::Accepted)
+    {
         ui->tableH->setSortingEnabled(false);
         insertRow(ui->tableH, ui->tableH->rowCount());
 
@@ -1838,7 +1978,9 @@ void MainWindow::newInvGross()
         ui->tableH->item(ui->tableH->rowCount() - 1, 4)->setText(row[4]); // buyer
         ui->tableH->item(ui->tableH->rowCount() - 1, 5)->setText(row[5]); // NIP
         ui->tableH->setSortingEnabled(true);
-    } else {
+    }
+    else
+    {
         rereadHist(true);
     }
 
@@ -1854,15 +1996,15 @@ void MainWindow::newInvGross()
 
 void MainWindow::newPForm()
 {
-    StrDebug;
+    StrDebug();
 
     auto invWindow = std::make_unique<Invoice>(this, dl, s_PROFORMA);
 
     invWindow->setWindowTitle(trUtf8("Faktura Pro Forma"));
     invWindow->backBtnClick();
 
-    if (invWindow->exec() == QDialog::Accepted) {
-
+    if (invWindow->exec() == QDialog::Accepted)
+    {
         ui->tableH->setSortingEnabled(false);
         insertRow(ui->tableH, ui->tableH->rowCount());
 
@@ -1875,8 +2017,9 @@ void MainWindow::newPForm()
         ui->tableH->item(ui->tableH->rowCount() - 1, 4)->setText(row[4]); // buyer
         ui->tableH->item(ui->tableH->rowCount() - 1, 5)->setText(row[5]); // NIP
         ui->tableH->setSortingEnabled(true);
-
-    } else {
+    }
+    else
+    {
         rereadHist(true);
     }
 
@@ -1892,17 +2035,19 @@ void MainWindow::newPForm()
 
 void MainWindow::newCor()
 {
-    StrDebug;
+    StrDebug();
 
-    if (ui->tableH->selectedItems().count() <= 0) {
-        QMessageBox::information(this,
-                                 trUtf8("QFaktury"),
-                                 trUtf8("Faktura nie została wybrana. Wybierz fakurę, do "
-                                        "której chcesz wystawić korektę."),
-                                 trUtf8("Ok"),
-                                 nullptr,
-                                 nullptr,
-                                 1);
+    if (ui->tableH->selectedItems().count() <= 0)
+    {
+        QMessageBox::information(
+            this,
+            trUtf8("QFaktury"),
+            trUtf8("Faktura nie została wybrana. Wybierz fakurę, do "
+                   "której chcesz wystawić korektę."),
+            trUtf8("Ok"),
+            nullptr,
+            nullptr,
+            1);
         return;
     }
 
@@ -1911,15 +2056,18 @@ void MainWindow::newCor()
     QStringList invTypes = QStringList("FVAT");
     invTypes << "FBrutto";
 
-    if (invTypes.contains(ui->tableH->item(row, 3)->text())) {
+    if (invTypes.contains(ui->tableH->item(row, 3)->text()))
+    {
         ui->tableH->setSortingEnabled(false);
 
         std::unique_ptr<Correction> corWindow;
 
-        if (ui->tableH->item(row, 3)->text().contains("FVAT")) {
+        if (ui->tableH->item(row, 3)->text().contains("FVAT"))
+        {
             corWindow = std::make_unique<Correction>(this, dl, s_CORRECT_TITLE, false);
-
-        } else {
+        }
+        else
+        {
             corWindow = std::make_unique<CorrectGross>(this, dl, s_CORRECT_BRUTTO, false);
         }
 
@@ -1927,7 +2075,8 @@ void MainWindow::newCor()
         corWindow->readData(ui->tableH->item(row, 0)->text());
         corWindow->setWindowTitle(trUtf8("Nowa korekta"));
 
-        if (corWindow->exec() == QDialog::Accepted) {
+        if (corWindow->exec() == QDialog::Accepted)
+        {
             insertRow(ui->tableH, ui->tableH->rowCount());
             QStringList row = corWindow->getRet().split("|");
             int newRow = ui->tableH->rowCount() - 1;
@@ -1937,8 +2086,9 @@ void MainWindow::newCor()
             ui->tableH->item(newRow, 3)->setText(row[3]); // type
             ui->tableH->item(newRow, 4)->setText(row[4]); // nabywca
             ui->tableH->item(newRow, 5)->setText(row[5]); // NIP
-
-        } else {
+        }
+        else
+        {
             rereadHist(true);
         }
 
@@ -1948,13 +2098,15 @@ void MainWindow::newCor()
         dl->checkAllSymbInFiles();
         allSymbols = dl->getAllSymbols();
         ui->tableH->setSortingEnabled(true);
-
-    } else {
-        QMessageBox::information(this,
-                                 "QFaktury",
-                                 trUtf8("Do faktury typu ") + ui->tableH->item(row, 3)->text()
-                                     + (" nie wystawiamy korekt."),
-                                 QMessageBox::Ok);
+    }
+    else
+    {
+        QMessageBox::information(
+            this,
+            "QFaktury",
+            trUtf8("Do faktury typu ") + ui->tableH->item(row, 3)->text()
+                + (" nie wystawiamy korekt."),
+            QMessageBox::Ok);
     }
 }
 
@@ -1964,41 +2116,43 @@ void MainWindow::newCor()
 
 void MainWindow::newDuplicate()
 {
-    StrDebug;
+    StrDebug();
 
-    if (ui->tableH->selectedItems().count() <= 0) {
-        QMessageBox::information(this,
-                                 trUtf8("QFaktury"),
-                                 trUtf8("Faktura nie wybrana. Wybierz fakurę, do "
-                                        "której chcesz wystawić duplikat."),
-                                 trUtf8("Ok"),
-                                 nullptr,
-                                 nullptr,
-                                 1);
+    if (ui->tableH->selectedItems().count() <= 0)
+    {
+        QMessageBox::information(
+            this,
+            trUtf8("QFaktury"),
+            trUtf8("Faktura nie wybrana. Wybierz fakurę, do "
+                   "której chcesz wystawić duplikat."),
+            trUtf8("Ok"),
+            nullptr,
+            nullptr,
+            1);
         return;
     }
 
-    int row {ui->tableH->selectedItems()[0]->row()};
+    int row { ui->tableH->selectedItems()[0]->row() };
 
     // types of invoices for which it's ok to issue a duplicate
     QStringList invTypes = QStringList("FVAT");
     invTypes << "FBrutto";
 
-    if (invTypes.contains(ui->tableH->item(row, 3)->text())) {
-
+    if (invTypes.contains(ui->tableH->item(row, 3)->text()))
+    {
         auto dupWindow = std::make_unique<Duplicate>(this, dl, s_DUPLICATE, false);
 
         dupWindow->readData(ui->tableH->item(row, 0)->text());
         dupWindow->setWindowTitle(trUtf8("Nowy duplikat"));
         dupWindow->duplicateInit();
 
-        if (dupWindow->exec() == QDialog::Accepted) {
-
+        if (dupWindow->exec() == QDialog::Accepted)
+        {
             insertRow(ui->tableH, ui->tableH->rowCount());
 
             QStringList row = dupWindow->getRet().split("|");
 
-            int newRow {ui->tableH->rowCount() - 1};
+            int newRow { ui->tableH->rowCount() - 1 };
 
             ui->tableH->item(newRow, 0)->setText(row[0]); // file name
             ui->tableH->item(newRow, 1)->setText(row[1]); // symbol
@@ -2006,8 +2160,9 @@ void MainWindow::newDuplicate()
             ui->tableH->item(newRow, 3)->setText(row[3]); // type
             ui->tableH->item(newRow, 4)->setText(row[4]); // nabywca
             ui->tableH->item(newRow, 5)->setText(row[5]); // NIP
-
-        } else {
+        }
+        else
+        {
             rereadHist(true);
         }
 
@@ -2017,13 +2172,15 @@ void MainWindow::newDuplicate()
         dl->checkAllSymbInFiles();
         allSymbols = dl->getAllSymbols();
         ui->tableH->setSortingEnabled(true);
-
-    } else {
-        QMessageBox::information(this,
-                                 "QFaktury",
-                                 trUtf8("Do faktury typu ") + ui->tableH->item(row, 3)->text()
-                                     + (" nie wystawiamy duplikatów."),
-                                 QMessageBox::Ok);
+    }
+    else
+    {
+        QMessageBox::information(
+            this,
+            "QFaktury",
+            trUtf8("Do faktury typu ") + ui->tableH->item(row, 3)->text()
+                + (" nie wystawiamy duplikatów."),
+            QMessageBox::Ok);
     }
 }
 
@@ -2032,12 +2189,12 @@ void MainWindow::newDuplicate()
 
 void MainWindow::goodsAdd()
 {
-    StrDebug;
+    StrDebug();
 
     auto goodsWindow = std::make_unique<Goods>(this, 0, dl);
 
-    if (goodsWindow->exec() == QDialog::Accepted) {
-
+    if (goodsWindow->exec() == QDialog::Accepted)
+    {
         ui->tableT->setSortingEnabled(false);
         insertRow(ui->tableT, ui->tableT->rowCount());
 
@@ -2063,32 +2220,35 @@ void MainWindow::goodsAdd()
  */
 void MainWindow::goodsDel()
 {
-    StrDebug;
+    StrDebug();
 
-    if (ui->tableT->selectedItems().count() <= 0) {
-        QMessageBox::information(this,
-                                 trUtf8("QFaktury"),
-                                 trUtf8("Towar nie został wybrany. Nie można usuwać."),
-                                 trUtf8("Ok"),
-                                 nullptr,
-                                 nullptr,
-                                 1);
+    if (ui->tableT->selectedItems().count() <= 0)
+    {
+        QMessageBox::information(
+            this,
+            trUtf8("QFaktury"),
+            trUtf8("Towar nie został wybrany. Nie można usuwać."),
+            trUtf8("Ok"),
+            nullptr,
+            nullptr,
+            1);
         return;
     }
 
     int row = ui->tableT->currentRow();
 
-    if (QMessageBox::warning(this,
-                             trUtf8("QFaktury"),
-                             trUtf8("Czy napewno chcesz usunąć towar ")
-                                 + ui->tableT->item(row, 0)->text() + "/"
-                                 + ui->tableT->item(row, 1)->text() + "?",
-                             trUtf8("Tak"),
-                             trUtf8("Nie"),
-                             nullptr,
-                             0,
-                             1)
-        == 0) {
+    if (QMessageBox::warning(
+            this,
+            trUtf8("QFaktury"),
+            trUtf8("Czy napewno chcesz usunąć towar ") + ui->tableT->item(row, 0)->text() + "/"
+                + ui->tableT->item(row, 1)->text() + "?",
+            trUtf8("Tak"),
+            trUtf8("Nie"),
+            nullptr,
+            0,
+            1)
+        == 0)
+    {
         dl->productsDeleteData(ui->tableT->item(row, 0)->text());
         ui->tableT->removeRow(row);
     }
@@ -2099,28 +2259,30 @@ void MainWindow::goodsDel()
 
 void MainWindow::goodsEdit()
 {
-    StrDebug;
+    StrDebug();
 
-    if (ui->tableT->selectedItems().count() <= 0) {
-        QMessageBox::information(this,
-                                 trUtf8("QFaktury"),
-                                 trUtf8("Towar nie został wybrany. Nie można edytować."),
-                                 trUtf8("Ok"),
-                                 nullptr,
-                                 nullptr,
-                                 1);
+    if (ui->tableT->selectedItems().count() <= 0)
+    {
+        QMessageBox::information(
+            this,
+            trUtf8("QFaktury"),
+            trUtf8("Towar nie został wybrany. Nie można edytować."),
+            trUtf8("Ok"),
+            nullptr,
+            nullptr,
+            1);
         return;
     }
 
-    int row {ui->tableT->selectedItems()[0]->row()};
+    int row { ui->tableT->selectedItems()[0]->row() };
 
     auto goodsWindow = std::make_unique<Goods>(this, 1, dl);
 
-    goodsWindow->selectData(ui->tableT->item(row, 0)->text(),
-                            sett().getProductType(ui->tableT->item(row, 5)->text()));
+    goodsWindow->selectData(
+        ui->tableT->item(row, 0)->text(), sett().getProductType(ui->tableT->item(row, 5)->text()));
 
-    if (goodsWindow->exec() == QDialog::Accepted) {
-
+    if (goodsWindow->exec() == QDialog::Accepted)
+    {
         ui->tableT->setSortingEnabled(false);
         QStringList rowTxt = goodsWindow->getRetGoods().split("|");
 
@@ -2152,15 +2314,17 @@ void MainWindow::openJPKDirectory()
     if (jpkInfoDir.isDir() && jpkInfoDir.exists())
         QDesktopServices::openUrl(QUrl(sett().getJPKDir(), QUrl::TolerantMode));
     else
-        QMessageBox::information(this,
-                                 "Brak katalogu",
-                                 "Aby otworzyć katalog, musi zostać wygenerowany chociaż jeden "
-                                 "jednolity plik kontrolny dowolnego typu (JPK)");
+        QMessageBox::information(
+            this,
+            "Brak katalogu",
+            "Aby otworzyć katalog, musi zostać wygenerowany chociaż jeden "
+            "jednolity plik kontrolny dowolnego typu (JPK)");
 }
 
 void MainWindow::checkDateRange(const QDate &date)
 {
-    if (date.year() > QDate::currentDate().year()) {
+    if (date.year() > QDate::currentDate().year())
+    {
         QMessageBox::information(
             this,
             "Filtr faktur",
@@ -2168,7 +2332,8 @@ void MainWindow::checkDateRange(const QDate &date)
 
         // e.g. casting to the class you know its connected with
         QDateEdit *dateEd = qobject_cast<QDateEdit *>(sender());
-        if (nullptr != dateEd) {
+        if (nullptr != dateEd)
+        {
             dateEd->setDate(QDate::currentDate());
         }
     }
@@ -2176,9 +2341,9 @@ void MainWindow::checkDateRange(const QDate &date)
 
 void MainWindow::noteDownTask(const QDate &date)
 {
-    StrDebug;
+    StrDebug();
 
-    //is automatically set to 0 when the referenced object is destroyed
+    // is automatically set to 0 when the referenced object is destroyed
     QPointer<Organizer> organizer = new Organizer(ui->todayExercise, date);
 
     if (organizer.isNull())
@@ -2187,13 +2352,15 @@ void MainWindow::noteDownTask(const QDate &date)
 
 void MainWindow::openHideOrganizer()
 {
-    StrDebug;
+    StrDebug();
 
-    if (ui->organizer->isHidden()) {
+    if (ui->organizer->isHidden())
+    {
         ui->organizer->show();
         ui->hideOrganizer->setText(">>");
-
-    } else {
+    }
+    else
+    {
         ui->organizer->hide();
         ui->hideOrganizer->setText("<<");
     }
@@ -2204,18 +2371,21 @@ void MainWindow::openHideOrganizer()
 
 bool MainWindow::close()
 {
-    StrDebug;
+    StrDebug();
 
-    if (QMessageBox::question(this,
-                              trUtf8("Potwierdź"),
-                              trUtf8("Czy chcesz wyjść z programu?"),
-                              QMessageBox::Yes | QMessageBox::No,
-                              QMessageBox::Yes)
-        == QMessageBox::Yes) {
+    if (QMessageBox::question(
+            this,
+            trUtf8("Potwierdź"),
+            trUtf8("Czy chcesz wyjść z programu?"),
+            QMessageBox::Yes | QMessageBox::No,
+            QMessageBox::Yes)
+        == QMessageBox::Yes)
+    {
         saveAllSett();
         return QMainWindow::close();
-
-    } else {
+    }
+    else
+    {
         return false;
     }
 }
@@ -2225,11 +2395,11 @@ bool MainWindow::close()
 
 void MainWindow::sendEmailToBuyer()
 {
-    StrDebug;
+    StrDebug();
 
-    QPointer<Send> sendEmailWidget = new Send(dl->buyersSelectAllData(),
-                                              dl->invoiceSelectAllData(ui->filtrStart->date(),
-                                                                       ui->filtrEnd->date()));
+    QPointer<Send> sendEmailWidget = new Send(
+        dl->buyersSelectAllData(),
+        dl->invoiceSelectAllData(ui->filtrStart->date(), ui->filtrEnd->date()));
     sendEmailWidget.data()->show();
 
     if (sendEmailWidget.isNull())
@@ -2242,14 +2412,15 @@ void MainWindow::sendEmailToBuyer()
 
 void MainWindow::on_WZAction_triggered()
 {
-    StrDebug;
+    StrDebug();
 
     auto noteWindow = std::make_unique<DeliveryNote>(this, dl, s_WZ);
 
     noteWindow->setWindowTitle(trUtf8("WZ"));
     noteWindow->backBtnClick();
 
-    if (noteWindow->exec() == QDialog::Accepted) {
+    if (noteWindow->exec() == QDialog::Accepted)
+    {
         ui->tableM->setSortingEnabled(false);
         insertRow(ui->tableM, ui->tableM->rowCount());
 
@@ -2265,8 +2436,9 @@ void MainWindow::on_WZAction_triggered()
 
         rereadWarehouses(true);
         rereadHist(true);
-
-    } else {
+    }
+    else
+    {
         rereadWarehouses(true);
         rereadHist(true);
     }
@@ -2280,14 +2452,15 @@ void MainWindow::on_WZAction_triggered()
 
 void MainWindow::on_RWAction_triggered()
 {
-    StrDebug;
+    StrDebug();
 
     auto noteWindow = std::make_unique<GoodsIssuedNotes>(this, dl, s_RW);
 
     noteWindow->setWindowTitle(trUtf8("RW"));
     noteWindow->backBtnClick();
 
-    if (noteWindow->exec() == QDialog::Accepted) {
+    if (noteWindow->exec() == QDialog::Accepted)
+    {
         ui->tableM->setSortingEnabled(false);
         insertRow(ui->tableM, ui->tableM->rowCount());
 
@@ -2302,8 +2475,9 @@ void MainWindow::on_RWAction_triggered()
         ui->tableM->setSortingEnabled(true);
 
         rereadWarehouses(true);
-
-    } else {
+    }
+    else
+    {
         rereadWarehouses(true);
     }
 
@@ -2313,12 +2487,13 @@ void MainWindow::on_RWAction_triggered()
 
 void MainWindow::openJPKGenerator()
 {
-    StrDebug;
+    StrDebug();
 
     RunGuard guard("saftfile_run_protection");
 
-    if (guard.tryToRun()) {
-        //is automatically set to 0 when the referenced object is destroyed
+    if (guard.tryToRun())
+    {
+        // is automatically set to 0 when the referenced object is destroyed
         QPointer<Saftfile> saftfileWindow = new Saftfile(dl);
 
         if (saftfileWindow.isNull())
@@ -2328,28 +2503,28 @@ void MainWindow::openJPKGenerator()
 
 void MainWindow::createBackupMode()
 {
-    StrDebug;
+    StrDebug();
 
     QPointer<Backup> backup = new Backup(QString("create"));
 }
 
 void MainWindow::loadBackupMode()
 {
-    StrDebug;
+    StrDebug();
 
     QPointer<Backup> backup = new Backup(QString("load"));
 }
 
 void MainWindow::intervalBackup()
 {
-    StrDebug;
+    StrDebug();
 
     QPointer<Backup> backup = new Backup(false);
 }
 
 void MainWindow::exportCsv()
 {
-    StrDebug;
+    StrDebug();
 
     QPointer<CsvExport> csvexport = new CsvExport(dl);
 }

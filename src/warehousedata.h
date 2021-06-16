@@ -4,67 +4,54 @@
 #ifndef WAREHOUSEDATA_H
 #define WAREHOUSEDATA_H
 
-#include "productdata.h"
 #include "documentdata.h"
+#include "productdata.h"
+
+#include <QDate>
 
 // class for holding informations about warehouse documents. One instance -> one
 // document
-class WarehouseData : public DocumentData {
-
+class WarehouseData final : public DocumentData
+{
 public:
-  QString getCustomer() { return customer; }
-  QString customer; // buyer
-  QMap<int, ProductData> products;
-  QDate liabDate;
-  QDate sellingDate;
-  QDate productDate;
-  QDate endTransDate;
-  QDate duplDate;
-  QString sellerAddress;
-  QString invNr;
-  QString paymentType;
-  QString additText;
+    QString getCustomer() const override;
 
-  QString type;
-  QString id;           // in case of xml, here goes filename
-  bool ifInvForDelNote; // for delivery note (WZ)
+    /**
+     *  Return invoice type
+     */
 
-  QString custStreet;
-  QString custTic;
-  QString custCity;
-  QString custName;
-  QDate issueDate;
-  int invoiceType; // 9 - WZ, 10 - RW
+    QString getInvoiceTypeAndSaveNr(int invoiceType);
 
-  // *START* for good issue note (RW)
-  QString goodFromPlace;
-  QString goodToPlace;
-  QString departmentCost;
-  QDate goodFromDate;
-  QDate goodToDate;
-  // *END*
+    QString customer; // buyer
+    QMap<int, ProductData> products;
+    QDate liabDate;
+    QDate sellingDate;
+    QDate productDate;
+    QDate endTransDate;
+    QDate duplDate;
+    QString sellerAddress;
+    QString invNr;
+    QString paymentType;
+    QString additText;
 
-  /**
-   *  Return invoice type
-   */
+    QString type;
+    QString id; // in case of xml, here goes filename
+    bool ifInvForDelNote; // for delivery note (WZ)
 
-  QString getInvoiceTypeAndSaveNr(int invoiceType) {
-    QString ret = "WZ";
+    QString custStreet;
+    QString custTic;
+    QString custCity;
+    QString custName;
+    QDate issueDate;
+    int invoiceType; // 9 - WZ, 10 - RW
 
-    switch (invoiceType) {
-    case 9:
-      ret = QObject::trUtf8("WZ");
-      break;
-    case 10:
-      ret = QObject::trUtf8("RW");
-      break;
-    default:
-      ret = QObject::trUtf8("WZ");
-      break;
-    }
-
-    return ret;
-  }
+    // *START* for good issue note (RW)
+    QString goodFromPlace;
+    QString goodToPlace;
+    QString departmentCost;
+    QDate goodFromDate;
+    QDate goodToDate;
+    // *END*
 };
 
 #endif

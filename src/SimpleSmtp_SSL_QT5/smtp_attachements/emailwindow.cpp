@@ -33,7 +33,7 @@ void EmailWindow::browse() {
 
 void EmailWindow::sendMail() {
   smtp = new Smtp(ui->uname->text(), ui->paswd->text(), ui->server->text(),
-                  ui->port->text().toInt());
+                  static_cast<quint16>(ui->port->text().toUInt()));
 
   if (!files.isEmpty())
     smtp->sendMail(ui->uname->text(), ui->rcpt->text(), ui->subject->text(),

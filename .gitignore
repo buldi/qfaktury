@@ -59,7 +59,6 @@ target_wrapper.*
 
 # QtCtreator CMake
 CMakeLists.txt.user*
-.*
 build
 doxygen
 /bin/

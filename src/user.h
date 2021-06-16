@@ -8,40 +8,40 @@
 #include "ui_user.h"
 
 // class for creating, saving and updating user account with GUI
-class User : public QDialog, public Ui::User {
-
-  Q_OBJECT
+class User final : public QDialog, public Ui::User
+{
+    Q_OBJECT
 
 public:
-  User(QWidget *parent);
+    User(QWidget *parent);
 
 public slots:
 
-  void init();
-  void okClick();
-  bool checkAll();
+    void init();
+    void okClick();
+    bool checkAll();
 
 private slots:
 
-  void on_nextSeller_clicked();
-  void delcurrSel();
-  void on_addAcc_clicked();
-  void on_remAcc_clicked();
-  void on_accountsCombo_currentTextChanged(const QString &arg1);
-  void on_addTel_clicked();
-  void on_remTel_clicked();
-  void on_telsCombo_currentTextChanged(const QString &arg1);
-  void on_addFax_clicked();
-  void on_remFax_clicked();
-  void on_faxesCombo_currentTextChanged(const QString &arg1);
-  void on_addEmail_clicked();
-  void on_remEmail_clicked();
-  void on_emailsCombo_currentTextChanged(const QString &arg1);
+    void on_nextSeller_clicked();
+    void delcurrSel();
+    void on_addAcc_clicked();
+    void on_remAcc_clicked();
+    void on_accountsCombo_currentTextChanged(const QString &arg1);
+    void on_addTel_clicked();
+    void on_remTel_clicked();
+    void on_telsCombo_currentTextChanged(const QString &arg1);
+    void on_addFax_clicked();
+    void on_remFax_clicked();
+    void on_faxesCombo_currentTextChanged(const QString &arg1);
+    void on_addEmail_clicked();
+    void on_remEmail_clicked();
+    void on_emailsCombo_currentTextChanged(const QString &arg1);
 
 private:
-  QList<QWidget *> sellersWidgets;
+    QList<QWidget *> sellersWidgets;
 
-  bool cameFromOldVersion();
-  void prepareFor_0_7_1(bool cameFromOlder);
+    bool cameFromOldVersion();
+    void prepareFor_0_7_1(bool cameFromOlder);
 };
 #endif
